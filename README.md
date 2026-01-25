@@ -18,12 +18,12 @@ Jaeone Oh
   - 제출/배포 기준 브랜치  
   - 항상 안정 상태 유지
 
-- `feature/<파트>-<작업>`  
+- `feature/<이름>-<작업>`  
   - 기능 개발 브랜치  
   - 예)
-    - `feature/A-eventLoop`
-    - `feature/B-httpParser`
-    - `feature/C-cgiBasic`
+    - `feature/ksh-eventLoop`
+    - `feature/kjh-httpParser`
+    - `feature/jaoh-cgiBasic`
 
 - `fix/<이슈>`  
   - 버그 수정 브랜치  
