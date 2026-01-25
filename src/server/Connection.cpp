@@ -19,7 +19,7 @@ const std::string& Connection::inBuf() const { return _in; }
 
 void Connection::queueWrite(const std::string& bytes) {
     // Clear old data if we've already sent everything
-    if (_outPos > 0 && _outPos >= _out.size()) {
+    if (_outPos > 0 && _outPos == _out.size()) {
         _out.clear();
         _outPos = 0;
     }
