@@ -8,8 +8,7 @@ class Connection {
 public:
     enum State {
         READING,
-        WRITING,
-        CLOSING
+        WRITING
     };
 
     explicit Connection(int fd);
@@ -41,6 +40,7 @@ private:
 
     std::string _in;
     std::string _out;
+    size_t _outPos;  // write offset to avoid repeated erase
 
     bool _closeAfterWrite;
     std::time_t _lastActive;
