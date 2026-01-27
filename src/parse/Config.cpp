@@ -6,13 +6,16 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/25 16:03:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/27 00:25:43 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/27 20:21:13 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Config.hpp"
+#include "LocationConfig.hpp"
 
-/* TODO) 예외처리 따로 만들어주기 */
+/* TODO) 
+	1. 예외처리 따로 만들어주기
+	2. validateServerBlock() / validateLocationBlock() 리팩토링 */
 
 Config::Config(const std::string &filePath)
 {
@@ -59,78 +62,148 @@ void	Config::validateDirective(size_t &i)
 
 void	Config::configParse()
 {
-	ParseState	state = STATE_GLOBAL;
-	size_t	i = 0 ;
+	LocationConfig	*currentLocation = 0; // location은 있을수도 있고, 없을 수도 있음(생성자 만들지 않음, 그래서 pointer 변수)
 
-	while (i < this->_tokens.size())
+	try
 	{
-		const Token	&token = this->_tokens[i];
+		ParseState	state = STATE_GLOBAL;
+		size_t	i = 0;
+		ServerConfig	currentServer; // 현재 server block
+		bool	serverOpened = false;
+		bool	locationOpened = false;
+
+		while (i < this->_tokens.size())
+		{
+			const Token	&token = this->_tokens[i];
 	
-		// global state
-		if (state == STATE_GLOBAL)
-		{
-			if (token.type == TOKEN_WORD && token.value == "server")
+			// global state
+			if (state == STATE_GLOBAL)
 			{
-				state = STATE_SERVER;
-				i++;
-				continue ;
+				/* TODO) 서버 블록은 모든 지시문 앞에 '{'를 붙여야 한다. 밑에 에러 검사가 애매하게 잡혀서 추후 리팩토링 예정: validateServerBlock() / validateLocationBlock() */
+				if (token.type == TOKEN_WORD && token.value == "server")
+				{
+					currentServer = ServerConfig(); // 새 서버 시작(생성)
+					serverOpened = false;
+					state = STATE_SERVER;
+					i++;
+					continue ;
+				}
+				else if (token.type == TOKEN_EOF)
+				{
+					if (serverOpened)
+						throw std::runtime_error("Error: unclosed server block at end of file");
+				
+					if (locationOpened)
+						throw std::runtime_error("Error: unclosed location block at end of file");
+				
+					break ;
+				}
+				else
+					throw std::runtime_error("Error: unexpected '{' outside server block");
 			}
-			else if (token.type == TOKEN_EOF)
+			// server state
+			else if (state == STATE_SERVER)
 			{
-				break ;
+				if (token.type == TOKEN_LBRACE) // {
+				{
+					if (serverOpened)
+						throw std::runtime_error("Error: duplicate '{' in server block");
+				
+					serverOpened = true;
+					i++;
+					continue ;
+				}
+				else if (token.type == TOKEN_RBRACE) // }
+				{
+					if (!serverOpened)
+						throw std::runtime_error("Error: '}' without matching '{' in server block");
+				
+					if (locationOpened)
+						throw std::runtime_error("Error: unclosed location block before server end");
+
+					this->_servers.push_back(currentServer); // server 저장
+					serverOpened = false;
+					state = STATE_GLOBAL; // 인스턴스 서버1개 끝 (중첩구조)
+					i++;
+					continue ;
+				}
+				else if (token.type == TOKEN_WORD && token.value == "location")
+				{
+					if (!serverOpened)
+						throw std::runtime_error("Error: location outside server block"); // '{' 없는 server 통과 가능성 있음
+			
+					if ((i + 1) >= this->_tokens.size() || this->_tokens[i + 1].type != TOKEN_WORD) // 다음 token이 없거나 타입이 다른지 미리 syntax 검사
+						throw std::runtime_error("Error: location requires a path");
+
+					std::string	path = this->_tokens[i + 1].value; // 다음 토큰이 path여야함: ex) /upload
+					currentLocation = new LocationConfig(path); // path를 가진 location 객체 생성
+					// locationOpened == true  → '{'를 이미 만난 상태
+					// locationOpened == false → 아직 '{'를 만나지 않은 상태
+					locationOpened = false;
+					i += 2; // location + path
+					state = STATE_LOCATION;
+					continue ;
+				}
+				else if (token.type == TOKEN_WORD)
+				{
+					if (!serverOpened)
+						throw std::runtime_error("Error: directive before '{' in server block");
+					// TODO) 지시문 syntax 검증 -> semantic parser에 넣기
+					currentServer.parseDirective(this->_tokens, i);
+					continue ;
+				}
+				else
+					throw std::runtime_error("Error: Invalid token in SERVER scope");
 			}
-			else
-				throw std::runtime_error("Error: unexpected '{' outside server block");
+			// location
+			else if (state == STATE_LOCATION)
+			{
+				if (!currentLocation) // 안전 검사
+					throw std::runtime_error("Error: Location state without location object");
+
+				if (token.type == TOKEN_LBRACE)
+				{
+					if (locationOpened)
+						throw std::runtime_error("Error: duplicate '{' in location block");
+				
+					locationOpened = true;
+					i++;
+					continue ;
+				}
+				else if (token.type == TOKEN_RBRACE)
+				{
+					if (!locationOpened)
+						throw std::runtime_error("Error: '}' without matching '{' in location block");
+				
+					currentServer.addLocation(*currentLocation);
+					delete currentLocation;
+					currentLocation = 0; // dangling pointer 방지(초기화)
+	
+					locationOpened = false;
+					state = STATE_SERVER; // location 위에 server
+					i++;
+					continue ;
+				}
+				else if (token.type == TOKEN_WORD)
+				{
+					if (!locationOpened)
+						throw std::runtime_error("Error: directive before '{' in location block");
+	
+					currentLocation->parseDirective(this->_tokens, i);
+					continue ;
+				}
+				else
+					throw std::runtime_error("Error: Invalid token in LOCATION scope");
+			}
 		}
-		// server state
-		else if (state == STATE_SERVER)
+	}
+	catch (...) // 어떤 타입의 예외든 다 받겠다, cleanup용(자원 정리)
+	{
+		if (currentLocation)
 		{
-			if (token.type == TOKEN_LBRACE) // {
-			{
-				i++;
-				continue ;
-			}
-			else if (token.type == TOKEN_RBRACE) // }
-			{
-				state = STATE_GLOBAL; // 인스턴스 서버1개 끝 (중첩구조)
-				i++;
-				continue ;
-			}
-			else if (token.type == TOKEN_WORD && token.value == "location")
-			{
-				state = STATE_LOCATION;
-				i++;
-				continue ;
-			}
-			else if (token.type == TOKEN_WORD)
-			{
-				validateDirective(i);
-				continue ;
-			}
-			else
-				throw std::runtime_error("Error: Invalid token in SERVER scope");
+			delete currentLocation;
+			currentLocation = 0;
 		}
-		// location
-		else if (state == STATE_LOCATION)
-		{
-			if (token.type == TOKEN_LBRACE)
-			{
-				i++;
-				continue ;
-			}
-			else if (token.type == TOKEN_RBRACE)
-			{
-				state = STATE_SERVER; // location 위에 server
-				i++;
-				continue ;
-			}
-			else if (token.type == TOKEN_WORD)
-			{
-				validateDirective(i);
-				continue ;
-			}
-			else
-				throw std::runtime_error("Error: Invalid token in LOCATION scope");
-		}
+		throw ;
 	}
 }

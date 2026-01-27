@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/25 16:04:02 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/27 00:20:07 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/27 19:01:35 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,6 +19,7 @@
 
 #include "Token.hpp"
 #include "ConfigTokenizer.hpp"
+#include "ServerConfig.hpp"
 #include <fstream>
 #include <sstream> // std::stringstream
 #include <stdexcept>
@@ -42,8 +43,9 @@ class	Config
 		void	validateDirective(size_t &i);
 	
 	private:
-		std::string			_content;
-		std::vector<Token>	_tokens;
+		std::string					_content;
+		std::vector<Token>			_tokens;
+		std::vector<ServerConfig>	_servers;
 	
 		std::string	openConfigFile(const std::string &filePath); // 내부 준비 작업이므로 private
 };
