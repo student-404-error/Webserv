@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/27 21:04:14 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/27 21:23:34 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,9 +15,9 @@
 #include <cstdlib>
 #include <cctype>
 
-ServerConfig::ServerConfig(void) {}
+ServerConfig::ServerConfig() {}
 
-ServerConfig::~ServerConfig(void) {}
+ServerConfig::~ServerConfig() {}
 
 /* 공통 helper func */
 static bool	isNumber(const std::string &s)

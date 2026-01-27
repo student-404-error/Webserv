@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:37 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/27 21:33:55 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/27 21:37:12 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,7 +18,7 @@ LocationConfig::~LocationConfig() {}
 
 void	LocationConfig::handleRoot(const std::vector<Token> &tokens, size_t &i)
 {
-	if ((i + 1) > tokens.size())
+	if ((i + 1) >= tokens.size())
 		throw std::runtime_error("Error: Root requires a path");
 	
 	const Token	&pathToken = tokens[i + 1];
