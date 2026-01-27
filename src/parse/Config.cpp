@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/25 16:03:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/27 20:21:13 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/27 21:10:31 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,7 +15,8 @@
 
 /* TODO) 
 	1. 예외처리 따로 만들어주기
-	2. validateServerBlock() / validateLocationBlock() 리팩토링 */
+	2. validateServerBlock() / validateLocationBlock() 리팩토링 
+	3. 지시문 syntax 검증 -> semantic parser에 넣기*/
 
 Config::Config(const std::string &filePath)
 {
@@ -43,7 +44,7 @@ std::string	Config::openConfigFile(const std::string &filePath)
 }
 
 /* i: directive의 첫 token_word를 가리켜야 함, ';'까지 문법 검증 */
-void	Config::validateDirective(size_t &i)
+/*void	Config::validateDirective(size_t &i)
 {
 	while (i < this->_tokens.size())
 	{
@@ -58,7 +59,7 @@ void	Config::validateDirective(size_t &i)
 	}
 	// EOF (세미콜론 없음)
 	throw std::runtime_error("Error: missing ';' at end of directive");
-}
+}*/
 
 void	Config::configParse()
 {
@@ -148,7 +149,6 @@ void	Config::configParse()
 				{
 					if (!serverOpened)
 						throw std::runtime_error("Error: directive before '{' in server block");
-					// TODO) 지시문 syntax 검증 -> semantic parser에 넣기
 					currentServer.parseDirective(this->_tokens, i);
 					continue ;
 				}

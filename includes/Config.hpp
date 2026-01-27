@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/25 16:04:02 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/27 19:01:35 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/27 21:08:08 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -40,7 +40,7 @@ class	Config
 		~Config(void);
 
 		void	configParse(void);
-		void	validateDirective(size_t &i);
+		//void	validateDirective(size_t &i); // ServerConfig::handler에서 각자 검사(조건이 다 다름)
 	
 	private:
 		std::string					_content;
