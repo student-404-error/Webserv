@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:24 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/27 18:19:15 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/27 21:22:41 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,7 @@
 
 #include "Token.hpp"
 #include <vector>
+#include <stdexcept>
 
 class	LocationConfig
 {
@@ -25,11 +26,14 @@ class	LocationConfig
 		void	parseDirective(const std::vector<Token> &tokens, size_t &i);
 	
 	private:
-		/* 기본 skeleton (대표 필드): 추후 추가 예정 */
+		/* 지시문 handlers funcs */
+		void	handleRoot(const std::vector<Token> &tokens, size_t &i);
+		void	handleAutoindex(const std::vector<Token> &tokens, size_t &i);
+		/* 기본 skeleton (대표 필드): 추후 추가 예정(TODO) 회의) */
 		std::string					_path;
 		std::string					_root;
 		bool						_autoindex;
-		std::vector<std::string>	_allowedMethods;
 }
 
 #endif
+
