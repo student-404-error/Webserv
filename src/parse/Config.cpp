@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/25 16:03:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/28 21:53:19 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/28 22:01:40 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -177,7 +177,9 @@ void	Config::configParse()
 				{
 					if (!locationOpened)
 						throw std::runtime_error("Error: '}' without matching '{' in location block");
-				
+			
+					currentLocation->validateLocationBlock(); // location semantic 유효성 검사
+					
 					currentServer.addLocation(*currentLocation);
 					delete currentLocation;
 					currentLocation = 0; // dangling pointer 방지(초기화)
