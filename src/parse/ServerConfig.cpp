@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/28 21:46:45 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/28 22:14:54 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -138,5 +138,14 @@ void	ServerConfig::validateServerBlock()
 	// 3) error_page 기본값
 	if (this->_errorPage.empty()) 
 		this->_errorPage = DEFAULT_ERROR_PAGE;
+	// 4) location path 중복 검사
+	for (size_t i = 0; i < this->_locations.size(); ++i)
+	{
+		for (size_t j = (i + 1); j < this->_locations.size(); ++j)
+		{
+			if (this->_locations[i].getPath() == this->_locations[j].getPath())
+				throw std::runtime_error("Error: Duplicate location path: " + this->_locations[i].getPath() + "\n" + this->_locations[j].getPath());
+		}
+	}
 }
 
