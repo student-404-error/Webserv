@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/25 16:03:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/27 21:10:31 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/28 21:53:19 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -121,7 +121,10 @@ void	Config::configParse()
 				
 					if (locationOpened)
 						throw std::runtime_error("Error: unclosed location block before server end");
-
+					
+					// server semantic 유효성 검사: 예외가 아니면 다음에 server 저장으로 간다
+					currentServer.validateServerBlock();
+					
 					this->_servers.push_back(currentServer); // server 저장
 					serverOpened = false;
 					state = STATE_GLOBAL; // 인스턴스 서버1개 끝 (중첩구조)
