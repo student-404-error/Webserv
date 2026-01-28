@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/27 21:23:34 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/28 21:46:45 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,10 @@
 #include "LocationConfig.hpp" // 헤더에 "LocationConfig라는 타입이 있다"만 알고 내부 구조 모름 (전방 선언)
 #include <cstdlib>
 #include <cctype>
+
+/* TODO) 임시로 넣은 기본 경로 (semantic validation 목적) / 팀 협의 필요 */
+static const std::string	DEFAULT_SERVER_ROOT = "./www";
+static const std::string	DEFAULT_ERROR_PAGE = "/errors/404.html";
 
 ServerConfig::ServerConfig() {}
 
@@ -122,4 +126,17 @@ void	ServerConfig::addLocation(const LocationConfig &location)
 	this->_locations.push_back(location);
 }
 
+/* TODO) 기본값 팀원 협의 필요 */
+void	ServerConfig::validateServerBlock()
+{
+	// 1) listen 필수 검사
+	if (this->_listenPorts.empty())
+		throw std::runtime_error("Error: Server block must contain at least 1 listen directive");
+	// 2) root 기본값
+	if (this->_root.empty())
+		this->_root = DEFAULT_SERVER_ROOT;
+	// 3) error_page 기본값
+	if (this->_errorPage.empty()) 
+		this->_errorPage = DEFAULT_ERROR_PAGE;
+}
 
