@@ -15,7 +15,7 @@ static void fatal(const char* msg) {
     std::exit(1);
 }
 
-Server::Server(const Config& cfg)
+Server::Server(const ServerConfig& cfg)
 : _cfg(cfg), _listenFd(-1), _sidSeq(1) {
     _listenFd = createListenSocket(_cfg.port);
     setNonBlocking(_listenFd);
@@ -145,22 +145,27 @@ void Server::handleClientEvent(size_t idx) {
 
         // Try parse requests as long as possible (pipelining-friendly)
         while (true) {
-            HttpRequest req;
+            HTTPRequest req;
             std::string& in = conn->inBuf();
 
-            bool got = req.tryParseFrom(in);
-            if (!got) break; // need more bytes
+            // HTTPRequest::appendData를 사용하여 파싱 시도
+            bool complete = req.appendData(in);
+            if (!complete) break; // need more bytes
 
-            if (req.badRequest()) {
-                HttpResponse resp;
-                resp.setStatus(400, "Bad Request");
+            if (req.hasError()) {
+                HTTPResponse resp;
+                resp.setStatus(400);
                 resp.setBody("400 Bad Request\n");
-                std::string bytes = resp.toBytes(false);
+                std::string bytes = resp.toString();
                 conn->queueWrite(bytes);
                 conn->closeAfterWrite();
                 break;
             }
 
+            // 파싱 성공 - 처리된 데이터는 버퍼에서 제거해야 함
+            // 간단하게 전체 버퍼를 클리어 (단일 요청 처리)
+            in.clear();
+            
             onRequest(fd, req);
             // if handler queued write and wants close, we may stop parsing more
             if (conn->shouldCloseAfterWrite()) break;
@@ -232,33 +237,66 @@ std::string Server::newSessionId() {
     return oss.str();
 }
 
-Server::Session& Server::getOrCreateSession(const HttpRequest& req, HttpResponse& resp) {
-    std::string sid = req.cookie("sid");
+Server::Session& Server::getOrCreateSession(const HTTPRequest& req, HTTPResponse& resp) {
+    // HTTPRequest에 cookie 메서드가 없으므로 헤더에서 직접 파싱
+    std::string cookieHeader;
+    const std::map<std::string, std::string>& headers = req.getHeaders();
+    std::map<std::string, std::string>::const_iterator it = headers.find("cookie");
+    if (it != headers.end()) {
+        cookieHeader = it->second;
+    }
+    
+    // 간단한 쿠키 파싱 (sid=value 형태)
+    std::string sid;
+    if (!cookieHeader.empty()) {
+        size_t pos = cookieHeader.find("sid=");
+        if (pos != std::string::npos) {
+            size_t start = pos + 4;
+            size_t end = cookieHeader.find(";", start);
+            if (end == std::string::npos) end = cookieHeader.length();
+            sid = cookieHeader.substr(start, end - start);
+        }
+    }
+    
     if (sid.empty() || _sessions.find(sid) == _sessions.end()) {
         sid = newSessionId();
         _sessions[sid] = Session();
-        resp.addSetCookie("sid=" + sid + "; Path=/; HttpOnly");
+        resp.setHeader("Set-Cookie", "sid=" + sid + "; Path=/; HttpOnly");
     }
     Session& s = _sessions[sid];
     s.lastSeen = std::time(NULL);
     return s;
 }
 
-void Server::onRequest(int fd, const HttpRequest& req) {
+void Server::onRequest(int fd, const HTTPRequest& req) {
     Connection* conn = _conns[fd];
 
     // keep-alive decision (simple)
     bool keepAlive = true;
-    std::string connHdr = req.header("connection");
-    if (!connHdr.empty() && (connHdr == "close" || connHdr == "Close")) keepAlive = false;
+    const std::map<std::string, std::string>& headers = req.getHeaders();
+    std::map<std::string, std::string>::const_iterator connIt = headers.find("connection");
+    if (connIt != headers.end()) {
+        std::string connHdr = connIt->second;
+        if (connHdr == "close" || connHdr == "Close") {
+            keepAlive = false;
+        }
+    }
 
-    HttpResponse resp;
+    HTTPResponse resp;
+
+    // URI에서 경로 추출 (쿼리 스트링 제거)
+    std::string uri = req.getURI();
+    std::string path = uri;
+    size_t qpos = uri.find('?');
+    if (qpos != std::string::npos) {
+        path = uri.substr(0, qpos);
+    }
 
     // ---- Simple routes (session demo) ----
-    if (req.path() == "/") {
+    if (path == "/") {
         resp.setBody("Hello from webserv skeleton\nTry /counter\n");
     }
-    else if (req.path() == "/counter") {
+    else if (path == "/counter") {
         Session& s = getOrCreateSession(req, resp);
         s.counter++;
 
@@ -266,17 +304,24 @@ void Server::onRequest(int fd, const HttpRequest& req) {
         body << "session counter = " << s.counter << "\n";
         resp.setBody(body.str());
     }
-    else if (req.path() == "/logout") {
+    else if (path == "/logout") {
         // expire cookie (very simple)
-        resp.addSetCookie("sid=deleted; Path=/; Max-Age=0");
+        resp.setHeader("Set-Cookie", "sid=deleted; Path=/; Max-Age=0");
         resp.setBody("logged out\n");
     }
     else {
-        resp.setStatus(404, "Not Found");
+        resp.setStatus(404);
         resp.setBody("404 Not Found\n");
     }
 
-    std::string bytes = resp.toBytes(keepAlive);
+    // Connection 헤더 설정
+    if (keepAlive) {
+        resp.setHeader("Connection", "keep-alive");
+    } else {
+        resp.setHeader("Connection", "close");
+    }
+
+    std::string bytes = resp.toString();
     conn->queueWrite(bytes);
 
     if (!keepAlive) conn->closeAfterWrite();
