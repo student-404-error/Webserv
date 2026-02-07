@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:24 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/27 21:22:41 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/28 22:05:43 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -24,6 +24,10 @@ class	LocationConfig
 		~LocationConfig(void);
 	
 		void	parseDirective(const std::vector<Token> &tokens, size_t &i);
+		void	validateLocationBlock(void); // server block 유효성 검사 함수와 동일
+
+		/* getter */
+		const std::string&	getPath(void) const;
 	
 	private:
 		/* 지시문 handlers funcs */
@@ -36,4 +40,3 @@ class	LocationConfig
 }
 
 #endif
-

@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:37 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/27 21:37:12 by princessj        ###   ########.fr       */
+/*   Updated: 2026/01/28 22:06:39 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -71,3 +71,16 @@ void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		throw std::runtime_error("Error: Unknown location directive: " + field);
 }
 
+void	LocationConfig::validateLocationBlock()
+{
+	// path 유효성 검사
+	if (this->_path.empty())
+		throw std::runtime_error("Error: Location path is empty");
+	if (this->_path[0] != '/') // ex) location '/'upload
+		throw std::runtime_error("Error: Location path must start whit '/'");
+}
+
+const std::string&	LocationConfig::getPath() const
+{
+	return this->_path;
+}
