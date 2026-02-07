@@ -37,6 +37,6 @@ class	LocationConfig
 		std::string					_path;
 		std::string					_root;
 		bool						_autoindex;
-}
+};
 
 #endif
