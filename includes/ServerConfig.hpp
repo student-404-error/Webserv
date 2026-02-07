@@ -14,10 +14,9 @@
 #define SERVERCONFIG_HPP
 
 #include "Token.hpp" // <string>은 Token.hpp에 있음
+#include "LocationConfig.hpp"
 #include <vector>
 #include <stdexcept>
-
-class LocationConfig; // forward declaration: 순환 include 위험
 
 class	ServerConfig
 {
@@ -28,6 +27,15 @@ class	ServerConfig
 		void	parseDirective(const std::vector<Token> &tokens, size_t &i);
 		void	addLocation(const LocationConfig &location); // location은 server 내부에 종속: ServerConfig가 관리 및 내부에서 통제 가능(캡슐화)
 		void	validateServerBlock(void); // server block 전체 보고 판단: 의미적으로 완성되었는가, 기본값을 채워야 하는가
+		
+		// Getters for Server runtime
+		const std::vector<int>& getListenPorts(void) const;
+		const std::string& getRoot(void) const;
+		const std::string& getErrorPage(void) const;
+		const std::vector<LocationConfig>& getLocations(void) const;
+		
+		// For testing/manual setup
+		void addListenPort(int port);
 	
 	private:
 		/* semantic handlersfuncs */
