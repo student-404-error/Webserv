@@ -1,0 +1,125 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   ServerConfig.cpp                                   :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
+/*   Updated: 2026/01/27 21:23:34 by princessj        ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "ServerConfig.hpp"
+#include "LocationConfig.hpp" // 헤더에 "LocationConfig라는 타입이 있다"만 알고 내부 구조 모름 (전방 선언)
+#include <cstdlib>
+#include <cctype>
+
+ServerConfig::ServerConfig() {}
+
+ServerConfig::~ServerConfig() {}
+
+/* 공통 helper func */
+static bool	isNumber(const std::string &s)
+{
+	if (s.empty())
+		return false;
+	
+	for (size_t i = 0; i < s.size(); i++)
+	{
+		if (!std::isdigit(s[i]))
+			return false;
+	}
+
+	return true;
+}
+
+void	ServerConfig::handleListen(const std::vector<Token> &tokens, size_t &i)
+{
+	if ((i + 1) >= tokens.size())
+		throw std::runtime_error("Error: Listen requires a port");
+	
+	const Token	&portToken = tokens[i + 1];
+
+	if (portToken.type != TOKEN_WORD || !isNumber(portToken.value))
+		throw std::runtime_error("Error: Invalid listen port");
+	
+	int	port = std::atoi(portToken.value.c_str());
+
+	if (port <= 0 || port > 65535)
+		throw std::runtime_error("Error: Listen port out of range");
+	
+	for (size_t j = 0; j < this->_listenPorts.size(); j++)
+	{
+		if (this->_listenPorts[j] == port)
+			throw std::runtime_error("Error: Duplicate listen port");
+	}
+
+	this->_listenPorts.push_back(port);
+
+	i += 2; // listen + port
+	if (tokens[i].type != TOKEN_SEMICOLON)
+		throw std::runtime_error("Error: missing ';' after listen directive");
+	
+	i++; // ';'
+}
+
+void	ServerConfig::handleRoot(const std::vector<Token> &tokens, size_t &i)
+{
+	if ((i + 1) >= tokens.size())
+		throw std::runtime_error("Error: root requires a path");
+	
+	const Token	&pathToken = tokens[i + 1];
+
+	if (pathToken.type != TOKEN_WORD)
+		throw std::runtime_error("Error: Invalid root path");
+	
+	this->_root = pathToken.value;
+
+	i += 2; // root + path
+	if (tokens[i].type != TOKEN_SEMICOLON)
+		throw std::runtime_error("Error: missing ';' after root directive");
+	
+	i++;
+}
+
+void	ServerConfig::handleErrorPage(const std::vector<Token> &tokens, size_t &i)
+{
+	if ((i + 1) >= tokens.size())
+		throw std::runtime_error("Error: Error_page requires a path");
+	
+	const Token	&pathToken = tokens[i + 1];
+
+	if (pathToken.type != TOKEN_WORD)
+		throw std::runtime_error("Error: Invalid error_page path");
+	
+	this->_errorPage = pathToken.value;
+
+	i += 2;
+	if (tokens[i].type != TOKEN_SEMICOLON)
+		throw std::runtime_error("Error: missing ';' after error_page directive");
+	
+	i++;
+}
+
+void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
+{
+	const std::string	&field = tokens[i].value;
+
+	if (field == "listen")
+		handleListen(tokens, i);
+	else if (field == "root")
+		handleRoot(tokens, i);
+	else if (field == "error_page")
+		handleErrorPage(tokens, i);
+	else
+		throw std::runtime_error("Error: unknown server directive: " + field);
+}
+
+/* 파싱 끝난 location 블록을 server 내부에 넣기 */
+void	ServerConfig::addLocation(const LocationConfig &location)
+{
+	this->_locations.push_back(location);
+}
+
+
