@@ -10,24 +10,21 @@
 #include "Connection.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
-
-struct ServerConfig {
-    int port;
-    int maxConnections;
-    int idleTimeoutSec;
-
-    ServerConfig() : port(8080), maxConnections(1024), idleTimeoutSec(15) {}
-};
+#include "ServerConfig.hpp"
 
 class Server {
 public:
-    explicit Server(const ServerConfig& cfg);
+    // explicit: 암묵적 변환을 막아 잘못된 생성 호출을 방지
+    explicit Server(const std::vector<ServerConfig>& cfgs);
     ~Server();
 
     void run();
 
 private:
-    ServerConfig _cfg;
+    std::vector<ServerConfig> _configs;      // 모든 server 블록 설정을 저장
+    int _port;
+    int _maxConnections;
+    int _idleTimeoutSec;
     int _listenFd;
 
     std::vector<pollfd> _pfds;               // [0] is listen fd
