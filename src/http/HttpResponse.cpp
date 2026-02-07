@@ -10,7 +10,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "HTTPResponse.hpp"
+#include "HttpResponse.hpp"
 #include <sstream>
 
 // 상수 정의

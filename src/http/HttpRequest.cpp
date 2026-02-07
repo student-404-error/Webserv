@@ -10,7 +10,7 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "HTTPRequest.hpp"
+#include "HttpRequest.hpp"
 #include <sstream>
 #include <cstdlib>
 #include <cctype>
