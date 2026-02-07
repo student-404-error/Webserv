@@ -11,23 +11,23 @@
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 
-struct Config {
+struct ServerConfig {
     int port;
     int maxConnections;
     int idleTimeoutSec;
 
-    Config() : port(8080), maxConnections(1024), idleTimeoutSec(15) {}
+    ServerConfig() : port(8080), maxConnections(1024), idleTimeoutSec(15) {}
 };
 
 class Server {
 public:
-    explicit Server(const Config& cfg);
+    explicit Server(const ServerConfig& cfg);
     ~Server();
 
     void run();
 
 private:
-    Config _cfg;
+    ServerConfig _cfg;
     int _listenFd;
 
     std::vector<pollfd> _pfds;               // [0] is listen fd
@@ -55,11 +55,11 @@ private:
     void sweepTimeouts();
 
     // request/response flow
-    void onRequest(int fd, const HttpRequest& req);
+    void onRequest(int fd, const HTTPRequest& req);
 
     // session helpers
     std::string newSessionId();
-    Session& getOrCreateSession(const HttpRequest& req, HttpResponse& resp);
+    Session& getOrCreateSession(const HTTPRequest& req, HTTPResponse& resp);
 };
 
 #endif

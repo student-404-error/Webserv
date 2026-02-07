@@ -95,8 +95,9 @@ std::string HTTPResponse::toString() {
     // 상태 라인: HTTP/1.1 200 OK
     oss << HTTP_VERSION << " " << statusCode << " " << statusMessage << CRLF;
 
-    for (const auto& header : headers) {
-        oss << header.first << HEADER_SEPARATOR << header.second << CRLF;
+    for (std::map<std::string, std::string>::const_iterator it = headers.begin(); 
+         it != headers.end(); ++it) {
+        oss << it->first << HEADER_SEPARATOR << it->second << CRLF;
     }
 
     // 헤더와 본문 구분 (빈 줄)
