@@ -149,3 +149,39 @@ void	ServerConfig::validateServerBlock()
 	}
 }
 
+
+/* Getters */
+const std::vector<int>& ServerConfig::getListenPorts() const
+{
+	return this->_listenPorts;
+}
+
+const std::string& ServerConfig::getRoot() const
+{
+	return this->_root;
+}
+
+const std::string& ServerConfig::getErrorPage() const
+{
+	return this->_errorPage;
+}
+
+const std::vector<LocationConfig>& ServerConfig::getLocations() const
+{
+	return this->_locations;
+}
+
+/* For testing/manual setup */
+void ServerConfig::addListenPort(int port)
+{
+	if (port <= 0 || port > 65535)
+		throw std::runtime_error("Error: Listen port out of range");
+	
+	for (size_t j = 0; j < this->_listenPorts.size(); j++)
+	{
+		if (this->_listenPorts[j] == port)
+			throw std::runtime_error("Error: Duplicate listen port");
+	}
+	
+	this->_listenPorts.push_back(port);
+}
