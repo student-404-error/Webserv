@@ -1,12 +1,12 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   Posthandler.hpp                                    :+:      :+:    :+:   */
+/*   PostHandler.hpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: jaoh <jaoh@student.42.fr>                  +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 17:52:50 by jaoh              #+#    #+#             */
-/*   Updated: 2026/02/03 17:52:58 by jaoh             ###   ########.fr       */
+/*   Updated: 2026/02/08 15:40:47 by jaoh             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,16 +19,16 @@
 class POSTHandler : public RequestHandler {
 public:
     POSTHandler(size_t maxBodySizeBytes);
-    virtual HTTPResponse handle(const HTTPRequest& request,
+    virtual HttpResponse handle(const HttpRequest& request,
                                 const LocationConfig& location);
 
 private:
-    bool checkBodySize(const HTTPRequest& request, HTTPResponse& res) const;
+    bool checkBodySize(const HttpRequest& request, HttpResponse& res) const;
 
     // Content-Type 분기
-    HTTPResponse handleFormUrlEncoded(const HTTPRequest& request,
+    HttpResponse handleFormUrlEncoded(const HttpRequest& request,
                                       const LocationConfig& location);
-    HTTPResponse handleMultipart(const HTTPRequest& request,
+    HttpResponse handleMultipart(const HttpRequest& request,
                                  const LocationConfig& location,
                                  const std::string& boundary);
 

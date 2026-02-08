@@ -1,26 +1,26 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   Posthandler.cpp                                    :+:      :+:    :+:   */
+/*   PostHandler.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: jaoh <jaoh@student.42.fr>                  +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 17:53:03 by jaoh              #+#    #+#             */
-/*   Updated: 2026/02/03 18:03:14 by jaoh             ###   ########.fr       */
+/*   Updated: 2026/02/08 15:40:47 by jaoh             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "Posthandler.hpp"
+#include "PostHandler.hpp"
 #include <sstream>
 #include <cstdlib>
 #include <cctype>
 
 POSTHandler::POSTHandler(size_t maxBodySizeBytes) : maxBodySize(maxBodySizeBytes) {}
 
-HTTPResponse POSTHandler::handle(const HTTPRequest& request,
+HttpResponse POSTHandler::handle(const HttpRequest& request,
                                  const LocationConfig& location) {
     (void)location;
-    HTTPResponse res;
+    HttpResponse res;
 
     // body size limit 체크 (413)
     if (!checkBodySize(request, res))
@@ -64,7 +64,7 @@ HTTPResponse POSTHandler::handle(const HTTPRequest& request,
     return res;
 }
 
-bool POSTHandler::checkBodySize(const HTTPRequest& request, HTTPResponse& res) const {
+bool POSTHandler::checkBodySize(const HttpRequest& request, HttpResponse& res) const {
     if (maxBodySize == 0) return true; // 0이면 제한 없음으로 팀 규칙 가능
     if (request.getBody().size() > maxBodySize) {
         res.setStatus(413);
@@ -76,10 +76,10 @@ bool POSTHandler::checkBodySize(const HTTPRequest& request, HTTPResponse& res) c
 
 /* ---------------- urlencoded ---------------- */
 
-HTTPResponse POSTHandler::handleFormUrlEncoded(const HTTPRequest& request,
+HttpResponse POSTHandler::handleFormUrlEncoded(const HttpRequest& request,
                                                const LocationConfig& location) {
     (void)location;
-    HTTPResponse res;
+    HttpResponse res;
 
     std::map<std::string,std::string> kv = parseUrlEncoded(request.getBody());
 
@@ -129,11 +129,11 @@ std::string POSTHandler::urlDecode(const std::string& s) const {
 
 /* ---------------- multipart ---------------- */
 
-HTTPResponse POSTHandler::handleMultipart(const HTTPRequest& request,
+HttpResponse POSTHandler::handleMultipart(const HttpRequest& request,
                                           const LocationConfig& location,
                                           const std::string& boundary) {
     (void)location;
-    HTTPResponse res;
+    HttpResponse res;
 
     std::vector< std::map<std::string,std::string> > parts;
     if (!parseMultipart(request.getBody(), boundary, parts)) {
