@@ -6,11 +6,11 @@
 /*   By: jaoh <jaoh@student.42.fr>                  +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/12/20 16:27:49 by jaoh              #+#    #+#             */
-/*   Updated: 2026/01/29 16:51:58 by jaoh             ###   ########.fr       */
+/*   Updated: 2026/02/08 14:53:31 by jaoh             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "HTTPResponse.hpp"
+#include "HttpResponse.hpp"
 #include <sstream>
 
 // 상수 정의
@@ -19,29 +19,29 @@ namespace {
     const std::string DEFAULT_STATUS_MESSAGE = "OK";
     const std::string DEFAULT_CONTENT_TYPE = "text/html";
     const std::string DEFAULT_CONNECTION = "close";
-    const std::string HTTP_VERSION = "HTTP/1.1";
+    const std::string Http_VERSION = "HTTP/1.1";
     const std::string CRLF = "\r\n";
     const std::string HEADER_SEPARATOR = ": ";
 }
 
-HTTPResponse::HTTPResponse() 
+HttpResponse::HttpResponse() 
     : statusCode(DEFAULT_STATUS_CODE), 
       statusMessage(DEFAULT_STATUS_MESSAGE) {}
 
-void HTTPResponse::setStatus(int code) {
+void HttpResponse::setStatus(int code) {
     statusCode = code;
     statusMessage = getStatusMessage(code);
 }
 
-void HTTPResponse::setHeader(const std::string& key, const std::string& value) {
+void HttpResponse::setHeader(const std::string& key, const std::string& value) {
     headers[key] = value;
 }
 
-void HTTPResponse::setContentType(const std::string& type) {
+void HttpResponse::setContentType(const std::string& type) {
     headers["Content-Type"] = type;
 }
 
-void HTTPResponse::setBody(const std::string& body) {
+void HttpResponse::setBody(const std::string& body) {
     this->body = body;
     
     // Content-Length 자동 계산
@@ -50,7 +50,7 @@ void HTTPResponse::setBody(const std::string& body) {
     headers["Content-Length"] = oss.str();
 }
 
-std::string HTTPResponse::getStatusMessage(int code) const {
+std::string HttpResponse::getStatusMessage(int code) const {
     switch (code) {
         case 200: return "OK";
         case 201: return "Created";
@@ -68,7 +68,7 @@ std::string HTTPResponse::getStatusMessage(int code) const {
     }
 }
 
-void HTTPResponse::ensureHeaders() {
+void HttpResponse::ensureHeaders() {
     // Content-Length가 없으면 본문 크기로 자동 설정
     if (headers.find("Content-Length") == headers.end()) {
         std::ostringstream oss;
@@ -87,13 +87,13 @@ void HTTPResponse::ensureHeaders() {
     }
 }
 
-std::string HTTPResponse::toString() {
+std::string HttpResponse::toString() {
     ensureHeaders();
 
     std::ostringstream oss;
     
     // 상태 라인: HTTP/1.1 200 OK
-    oss << HTTP_VERSION << " " << statusCode << " " << statusMessage << CRLF;
+    oss << Http_VERSION << " " << statusCode << " " << statusMessage << CRLF;
 
     for (const auto& header : headers) {
         oss << header.first << HEADER_SEPARATOR << header.second << CRLF;

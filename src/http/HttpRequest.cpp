@@ -6,11 +6,11 @@
 /*   By: jaoh <jaoh@student.42.fr>                  +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/20 16:24:43 by jaoh              #+#    #+#             */
-/*   Updated: 2026/01/29 16:53:45 by jaoh             ###   ########.fr       */
+/*   Updated: 2026/02/08 14:53:31 by jaoh             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "HTTPRequest.hpp"
+#include "HttpRequest.hpp"
 #include <sstream>
 #include <cstdlib>
 #include <cctype>
@@ -33,7 +33,7 @@ namespace {
     }
 }
 
-HTTPRequest::HTTPRequest()
+HttpRequest::HttpRequest()
     : headersParsed(false),
       bodyParsed(false),
       complete(false),
@@ -42,7 +42,7 @@ HTTPRequest::HTTPRequest()
       chunked(false),
       bodyStart(0) {}
 
-bool HTTPRequest::appendData(const std::string& data) {
+bool HttpRequest::appendData(const std::string& data) {
     rawBuffer += data;
 
     // 1단계: 헤더 파싱 (아직 완료되지 않은 경우)
@@ -72,7 +72,7 @@ bool HTTPRequest::appendData(const std::string& data) {
 
 /* ================= Request Line + Headers ================= */
 
-void HTTPRequest::parseRequestLine(const std::string& line) {
+void HttpRequest::parseRequestLine(const std::string& line) {
     std::stringstream ss(line);
     ss >> method >> uri >> version;
 
@@ -82,7 +82,7 @@ void HTTPRequest::parseRequestLine(const std::string& line) {
     }
 }
 
-void HTTPRequest::parseHeaders(const std::string& block) {
+void HttpRequest::parseHeaders(const std::string& block) {
     std::istringstream iss(block);
     std::string line;
 
@@ -128,7 +128,7 @@ void HTTPRequest::parseHeaders(const std::string& block) {
 
 /* ================= Body ================= */
 
-bool HTTPRequest::parseBody() {
+bool HttpRequest::parseBody() {
     // Chunked 전송 인코딩인 경우
     if (chunked) {
         return parseChunkedBody();
@@ -152,7 +152,7 @@ bool HTTPRequest::parseBody() {
 
 /* ================= Chunked ================= */
 
-bool HTTPRequest::parseChunkedBody() {
+bool HttpRequest::parseChunkedBody() {
     size_t currentPos = bodyStart;
 
     while (true) {
@@ -192,7 +192,7 @@ bool HTTPRequest::parseChunkedBody() {
 
 /* ================= Utils ================= */
 
-std::string HTTPRequest::trim(const std::string& s) const {
+std::string HttpRequest::trim(const std::string& s) const {
     // 앞쪽 공백 제거
     size_t start = 0;
     while (start < s.size() && std::isspace(s[start])) {
@@ -208,7 +208,7 @@ std::string HTTPRequest::trim(const std::string& s) const {
     return s.substr(start, end - start);
 }
 
-std::string HTTPRequest::toLower(const std::string& s) const {
+std::string HttpRequest::toLower(const std::string& s) const {
     std::string result;
     result.reserve(s.size());  // 메모리 할당 최적화
     
@@ -221,30 +221,30 @@ std::string HTTPRequest::toLower(const std::string& s) const {
 
 /* ================= Getters ================= */
 
-bool HTTPRequest::isComplete() const {
+bool HttpRequest::isComplete() const {
     return complete;
 }
 
-bool HTTPRequest::hasError() const {
+bool HttpRequest::hasError() const {
     return error;
 }
 
-const std::string& HTTPRequest::getMethod() const {
+const std::string& HttpRequest::getMethod() const {
     return method;
 }
 
-const std::string& HTTPRequest::getURI() const {
+const std::string& HttpRequest::getURI() const {
     return uri;
 }
 
-const std::string& HTTPRequest::getVersion() const {
+const std::string& HttpRequest::getVersion() const {
     return version;
 }
 
-const std::map<std::string, std::string>& HTTPRequest::getHeaders() const {
+const std::map<std::string, std::string>& HttpRequest::getHeaders() const {
     return headers;
 }
 
-const std::string& HTTPRequest::getBody() const {
+const std::string& HttpRequest::getBody() const {
     return body;
 }
