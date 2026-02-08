@@ -26,7 +26,7 @@ class	ServerConfig
 		~ServerConfig(void);
 
     		/* getter */
-		const std::vector<int>& getListenPorts(void) const;
+		std::vector<int> getListenPorts(void) const;
 		const std::vector<LocationConfig>& getLocations(void) const;
 		const std::string&				getRoot(void) const;
 		const std::string&				getErrorPage(void) const;
