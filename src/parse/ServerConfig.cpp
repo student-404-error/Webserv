@@ -233,20 +233,6 @@ const std::vector<LocationConfig>& ServerConfig::getLocations() const
 	return this->_locations;
 }
 
-/* For testing/manual setup */
-void ServerConfig::addListenPort(int port)
-{
-	if (port <= 0 || port > 65535)
-		throw std::runtime_error("Error: Listen port out of range");
-
-	checkDuplicateListen("0.0.0.0", port);
-
-	ListenAddress addr;
-	addr.ip = "0.0.0.0";
-	addr.port = port;
-	_listen.push_back(addr);
-}
-
 void	ServerConfig::validateServerBlock()
 {
 	validateListenDirective(); // 1) listen 필수 검사
