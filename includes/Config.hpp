@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/25 16:04:02 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/27 21:08:08 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/08 06:17:34 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,6 +20,7 @@
 #include "Token.hpp"
 #include "ConfigTokenizer.hpp"
 #include "ServerConfig.hpp"
+#include "ConfigException.hpp"
 #include <fstream>
 #include <sstream> // std::stringstream
 #include <stdexcept>
