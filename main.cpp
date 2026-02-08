@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
 
     // 2. HTTP Request 파싱 테스트
     std::cout << "\n[2] HTTP Request Parsing Test" << std::endl;
-    HTTPRequest req;
+    HttpRequest req;
     
     std::string testRequest = 
         "GET /index.html HTTP/1.1\r\n"
@@ -45,7 +45,7 @@ int main(int argc, char* argv[])
 
     // 3. HTTP Response 생성 테스트
     std::cout << "\n[3] HTTP Response Generation Test" << std::endl;
-    HTTPResponse resp;
+    HttpResponse resp;
     resp.setStatus(200);
     resp.setContentType("text/html");
     resp.setBody("<html><body><h1>Hello, Webserv!</h1></body></html>");

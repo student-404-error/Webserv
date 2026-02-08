@@ -60,11 +60,11 @@ private:
     void sweepTimeouts();
 
     // request/response flow
-    void onRequest(int fd, const HTTPRequest& req);
+    void onRequest(int fd, const HttpRequest& req);
 
     // session helpers
     std::string newSessionId();
-    Session& getOrCreateSession(const HTTPRequest& req, HTTPResponse& resp);
+    Session& getOrCreateSession(const HttpRequest& req, HttpResponse& resp);
 
     bool isListenFd(int fd) const;
 };

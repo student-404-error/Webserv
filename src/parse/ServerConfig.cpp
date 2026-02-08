@@ -209,9 +209,13 @@ void	ServerConfig::duplicateLocationPathCheck() const
 
 
 /* Getters */
-const std::vector<int>& ServerConfig::getListenPorts() const
+std::vector<int> ServerConfig::getListenPorts() const
 {
-	return this->_listenPorts;
+	std::vector<int> ports;
+	ports.reserve(_listen.size());
+	for (size_t i = 0; i < _listen.size(); i++)
+		ports.push_back(_listen[i].port);
+	return ports;
 }
 
 const std::string& ServerConfig::getRoot() const
@@ -234,16 +238,13 @@ void ServerConfig::addListenPort(int port)
 {
 	if (port <= 0 || port > 65535)
 		throw std::runtime_error("Error: Listen port out of range");
-	
-	for (size_t j = 0; j < this->_listenPorts.size(); j++)
-	{
-		if (this->_listenPorts[j] == port)
-			throw std::runtime_error("Error: Duplicate listen port");
-	}
-	
-	this->_listenPorts.push_back(port);
-}
-	}	
+
+	checkDuplicateListen("0.0.0.0", port);
+
+	ListenAddress addr;
+	addr.ip = "0.0.0.0";
+	addr.port = port;
+	_listen.push_back(addr);
 }
 
 void	ServerConfig::validateServerBlock()
