@@ -28,6 +28,8 @@ private:
     int _port;                               // 첫 포트 (임시 호환성)
     int _maxConnections;
     int _idleTimeoutSec;
+    int _writeTimeoutSec;
+    int _maxKeepAlive;
 
     std::vector<pollfd> _pfds;               // [0..n) 리스너, 이후 클라이언트
     std::map<int, Connection*> _conns;       // fd -> Connection*

@@ -31,7 +31,9 @@ Server::Server(const std::vector<ServerConfig>& cfgs)
 
     // 기본값 설정 (TODO: config에서 받아오도록 확장)
     _maxConnections = 1024;
-    _idleTimeoutSec = 15;
+    _idleTimeoutSec = 15;   // idle/read timeout 기본값
+    _writeTimeoutSec = 10;  // 쓰기 지연 기본값
+    _maxKeepAlive = 100;    // 연결당 최대 요청 수
 
     // 각 포트마다 리스너 생성 및 poll 등록
     for (std::set<int>::const_iterator it = ports.begin(); it != ports.end(); ++it) {
@@ -193,10 +195,15 @@ void Server::handleClientEvent(size_t idx) {
             // 파싱 성공 - 처리된 데이터는 버퍼에서 제거해야 함
             // 간단하게 전체 버퍼를 클리어 (단일 요청 처리)
             in.clear();
-            
+
+            conn->incRequestCount();
             onRequest(fd, req);
             // if handler queued write and wants close, we may stop parsing more
             if (conn->shouldCloseAfterWrite()) break;
+            if (conn->requestCount() >= _maxKeepAlive) {
+                conn->closeAfterWrite();
+                break;
+            }
         }
     }
 
@@ -243,8 +250,11 @@ void Server::sweepTimeouts() {
 
     for (std::map<int, Connection*>::iterator it = _conns.begin(); it != _conns.end(); ++it) {
         Connection* c = it->second;
-        if ((int)(now - c->lastActive()) > _idleTimeoutSec) {
-            toClose.push_back(it->first);
+        int idle = static_cast<int>(now - c->lastActive());
+        if (!c->hasPendingWrite()) {
+            if (idle > _idleTimeoutSec) toClose.push_back(it->first);
+        } else {
+            if (idle > _writeTimeoutSec) toClose.push_back(it->first);
         }
     }
     for (size_t i = 0; i < toClose.size(); ++i) removeConn(toClose[i]);
