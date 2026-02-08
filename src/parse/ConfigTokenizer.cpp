@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/26 22:35:52 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/26 23:12:08 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/08 14:44:34 by jihyeki2         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,14 +29,14 @@ std::vector<Token>	ConfigTokenizer::tokenize(const std::string &content)
 		else if (content[i] == '{')
 		{
 			tokens.push_back(Token()); // tokens은 Token 타입 vector이기 때문에 Token을 넣어줘야함
-			tokens.back().type = TOKEN_RBRACE; // 마지막에 넣은 토큰의 타입을 명시 (윗줄 토큰)
+			tokens.back().type = TOKEN_LBRACE; // 마지막에 넣은 토큰의 타입을 명시 (윗줄 토큰)
 			tokens.back().value = "{";
 			i++;
 		}
 		else if (content[i] == '}')
 		{
 			tokens.push_back(Token());
-			tokens.back().type = TOKEN_LBRACE;
+			tokens.back().type = TOKEN_RBRACE;
 			tokens.back().value = "}";
 			i++;
 		}
