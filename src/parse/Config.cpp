@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/25 16:03:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/28 22:01:40 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/08 06:18:17 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -34,7 +34,7 @@ std::string	Config::openConfigFile(const std::string &filePath)
 	std::ifstream	configFile(filePath.c_str());
 
 	if (!configFile.is_open())
-		throw std::runtime_error("Error: Config file open failed: " + filePath); // main에서 try,catch문으로 예외처리 예정
+		throw ConfigFileException("Error: Config file open failed: " + filePath); // main에서 try,catch문으로 예외처리 예정
 	
 	std::stringstream	buffer;
 	buffer << configFile.rdbuf(); // stream의 내부 버퍼를 꺼내는 함수: configFile 버퍼 전체 복사후 buffer에 넣기
