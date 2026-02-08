@@ -6,7 +6,7 @@
 /*   By: jaoh <jaoh@student.42.fr>                  +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/23 16:28:47 by jaoh              #+#    #+#             */
-/*   Updated: 2026/01/26 16:28:58 by jaoh             ###   ########.fr       */
+/*   Updated: 2026/02/08 14:42:22 by jaoh             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,7 +23,7 @@ void Router::addLocation(const LocationConfig& loc) {
 ** /images/cat.png → /images
 */
 const LocationConfig* Router::match(const std::string& uri) const {
-    const LocationConfig* best = nullptr;
+    const LocationConfig* best = NULL;
     size_t bestLen = 0;
 
     for (size_t i = 0; i < locations.size(); i++) {
