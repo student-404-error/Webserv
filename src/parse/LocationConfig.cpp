@@ -6,11 +6,32 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:37 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/28 22:06:39 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/08 05:44:45 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "LocationConfig.hpp"
+
+/* 공통 helper 함수 (리팩토링) */
+static const Token&	directiveSyntaxCheck(const std::vector<Token>& tokens, size_t& i, const std::string& directiveName)
+{
+	if ((i + 1) >= tokens.size())
+		throw std::runtime_error("Error: " + directiveName + " requires an argument");
+	
+	const Token	&tokenValue = tokens[i + 1]; // token values
+	
+	if (tokenValue.type != TOKEN_WORD)
+		throw std::runtime_error("Error: Invalid argument for " + directiveName);
+	
+	i += 2;
+
+	if (tokens[i].type != TOKEN_SEMICOLON)
+		throw std::runtime_error("Error: missing ';' after " + directiveName);
+	
+	i++;
+
+	return tokenValue;
+}
 
 LocationConfig::LocationConfig(const std::string &path) : _path(path), _autoindex(false) {}
 
@@ -18,45 +39,20 @@ LocationConfig::~LocationConfig() {}
 
 void	LocationConfig::handleRoot(const std::vector<Token> &tokens, size_t &i)
 {
-	if ((i + 1) >= tokens.size())
-		throw std::runtime_error("Error: Root requires a path");
-	
-	const Token	&pathToken = tokens[i + 1];
-
-	if (pathToken.type != TOKEN_WORD)
-		throw std::runtime_error("Error: Invalid root path");
-	
-	this->_root = pathToken.value;
-
-	i += 2;
-	if (tokens[i].type != TOKEN_SEMICOLON)
-		throw std::runtime_error("Error: Missing ';' after root directive");
-	
-	i++;
+	const Token	&valueToken = directiveSyntaxCheck(tokens, i, "root");
+	this->_root = valueToken.value;
 }
 
 void	LocationConfig::handleAutoindex(const std::vector<Token> &tokens, size_t &i)
 {
-	if ((i + 1) >= tokens.size())
-		throw std::runtime_error("Error: Autoindex requires on or off");
-	
-	const Token	&valueToken = tokens[i + 1];
-	
-	if (valueToken.type != TOKEN_WORD)
-		throw std::runtime_error("Error: Invalid autoindex value");
+	const Token	&valueToken = directiveSyntaxCheck(tokens, i, "autoindex");
 	
 	if (valueToken.value == "on")
 		this->_autoindex = true;
 	else if (valueToken.value == "off")
 		this->_autoindex = false;
 	else
-		throw std::runtime_error("Error: Autoindex must be 'on' or 'off'");
-	
-	i += 2;
-	if (tokens[i].type != TOKEN_SEMICOLON)
-		throw std::runtime_error("Error: Missing ';' after autoindex directive");
-	
-	i++;
+		throw std::runtime_error("Error: autoindex must be 'on' or 'off'");
 }
 
 void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
