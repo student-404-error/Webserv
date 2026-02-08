@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/08 07:50:36 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/08 15:08:23 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -133,7 +133,7 @@ void	ServerConfig::handleMethods(const std::vector<Token>& tokens, size_t& i)
 
 		const std::string& met = tokens[i].value;
 
-		if (m != "GET" && met != "POST" && met != "DELETE")
+		if (met != "GET" && met != "POST" && met != "DELETE")
 			throw ConfigSyntaxException("Error: methods: unknown method " + met);
 
 		_methods.push_back(met);
@@ -176,7 +176,7 @@ void	ServerConfig::checkDuplicateListen(const std::string& ip, int port) const
 
 void	ServerConfig::validateListenDirective() const
 {
-	if (this->_listenPorts.empty())
+	if (this->_listen.empty())
 		throw ConfigSemanticException("Error: Server block must contain at least 1 listen directive");
 }
 
