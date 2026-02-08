@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/08 05:45:31 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/08 06:24:59 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,10 +18,6 @@
 /* TODO) 임시로 넣은 기본 경로 (semantic validation 목적) / 팀 협의 필요 */
 static const std::string	DEFAULT_SERVER_ROOT = "./www";
 static const std::string	DEFAULT_ERROR_PAGE = "/errors/404.html";
-
-ServerConfig::ServerConfig() {}
-
-ServerConfig::~ServerConfig() {}
 
 /* 공통 helper func */
 static bool	isNumber(const std::string &s)
@@ -41,39 +37,43 @@ static bool	isNumber(const std::string &s)
 static const Token&	directiveSyntaxCheck(const std::vector<Token>& tokens, size_t& i, const std::string& directiveName)
 {
 	if ((i + 1) >= tokens.size())
-		throw std::runtime_error("Error: " + directiveName + " requires an argument");
+		throw ConfigSyntaxException("Error: " + directiveName + " requires an argument");
 	
 	const Token	&tokenValue = tokens[i + 1]; // token values
 	
 	if (tokenValue.type != TOKEN_WORD)
-		throw std::runtime_error("Error: Invalid argument for " + directiveName);
+		throw ConfigSyntaxException("Error: Invalid argument for " + directiveName);
 	
 	i += 2;
 
 	if (tokens[i].type != TOKEN_SEMICOLON)
-		throw std::runtime_error("Error: missing ';' after " + directiveName);
+		throw ConfigSyntaxException("Error: missing ';' after " + directiveName);
 	
 	i++;
 
 	return tokenValue;
 }
 
+ServerConfig::ServerConfig() {}
+
+ServerConfig::~ServerConfig() {}
+
 void	ServerConfig::handleListen(const std::vector<Token> &tokens, size_t &i)
 {
 	const Token	&portToken = directiveSyntaxCheck(tokens, i, "listen");
 
 	if (!isNumber(portToken.value))
-		throw std::runtime_error("Error: Invalide listen port");
+		throw ConfigSemanticException("Error: Invalide listen port");
 
 	int	port = std::atoi(protToken.value.c_str());
 
 	if (port <= 0 || port > 65535)
-		throw std::runtime_error("Error: Listen port out of range");
+		throw ConfigSemanticException("Error: Listen port out of range");
 
 	for (size_t j = 0; j < this->_listenPorts.size(); j++)
 	{
 		if (this->_listenPorts[j] == port)
-			throw std::runtime_error("Error: Duplicate listen port");
+			throw ConfigSemanticException("Error: Duplicate listen port");
 	}
 
 	this->_listenPorts.push_back(port);
@@ -102,7 +102,7 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 	else if (field == "error_page")
 		handleErrorPage(tokens, i);
 	else
-		throw std::runtime_error("Error: unknown server directive: " + field);
+		throw ConfigSyntaxException("Error: unknown server directive: " + field);
 }
 
 /* 파싱 끝난 location 블록을 server 내부에 넣기 */
@@ -111,26 +111,42 @@ void	ServerConfig::addLocation(const LocationConfig &location)
 	this->_locations.push_back(location);
 }
 
-/* TODO) 기본값 팀원 협의 필요 */
-void	ServerConfig::validateServerBlock()
+void	ServerConfig::validateListenDirective() const
 {
-	// 1) listen 필수 검사
 	if (this->_listenPorts.empty())
-		throw std::runtime_error("Error: Server block must contain at least 1 listen directive");
-	// 2) root 기본값
+		throw ConfigSyntaxException("Error: Server block must contain at least 1 listen directive");
+}
+
+void	ServerConfig::applyDefaultRoot()
+{
 	if (this->_root.empty())
 		this->_root = DEFAULT_SERVER_ROOT;
-	// 3) error_page 기본값
-	if (this->_errorPage.empty()) 
+}
+
+void	ServerConfig::applyDefaultErrorPage()
+{
+	if (this->_errorPage.empty())
 		this->_errorPage = DEFAULT_ERROR_PAGE;
-	// 4) location path 중복 검사
+}
+
+void	ServerConfig::duplicateLocationPathCheck() const
+{
 	for (size_t i = 0; i < this->_locations.size(); ++i)
 	{
 		for (size_t j = (i + 1); j < this->_locations.size(); ++j)
 		{
 			if (this->_locations[i].getPath() == this->_locations[j].getPath())
-				throw std::runtime_error("Error: Duplicate location path: " + this->_locations[i].getPath() + "\n" + this->_locations[j].getPath());
+				throw ConfigSyntaxException("Error: Duplicate location path: " + this->_locations[i].getPath() + "\n" + this->_locations[j].getPath());
 		}
-	}
+	}	
+}
+
+
+void	ServerConfig::validateServerBlock()
+{
+	validateListenDirective(); // 1) listen 필수 검사
+	applyDefaultRoot(); // 2) root 기본값
+	applyDefaultErrorPage(); // 3) error_page 기본값
+	duplicateLocationPathCheck(); // 4) location path 중복 검사
 }
 

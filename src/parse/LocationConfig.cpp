@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:37 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/08 05:44:45 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/08 06:27:16 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,17 +16,17 @@
 static const Token&	directiveSyntaxCheck(const std::vector<Token>& tokens, size_t& i, const std::string& directiveName)
 {
 	if ((i + 1) >= tokens.size())
-		throw std::runtime_error("Error: " + directiveName + " requires an argument");
+		throw ConfigSyntaxException("Error: " + directiveName + " requires an argument");
 	
 	const Token	&tokenValue = tokens[i + 1]; // token values
 	
 	if (tokenValue.type != TOKEN_WORD)
-		throw std::runtime_error("Error: Invalid argument for " + directiveName);
+		throw ConfigSyntaxException("Error: Invalid argument for " + directiveName);
 	
 	i += 2;
 
 	if (tokens[i].type != TOKEN_SEMICOLON)
-		throw std::runtime_error("Error: missing ';' after " + directiveName);
+		throw ConfigSyntaxException("Error: missing ';' after " + directiveName);
 	
 	i++;
 
@@ -52,7 +52,7 @@ void	LocationConfig::handleAutoindex(const std::vector<Token> &tokens, size_t &i
 	else if (valueToken.value == "off")
 		this->_autoindex = false;
 	else
-		throw std::runtime_error("Error: autoindex must be 'on' or 'off'");
+		throw ConfigSemanticException("Error: autoindex must be 'on' or 'off'");
 }
 
 void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
@@ -64,16 +64,22 @@ void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 	else if (field == "autoindex")
 		handleAutoindex(tokens, i);
 	else
-		throw std::runtime_error("Error: Unknown location directive: " + field);
+		throw ConfigSemanticException("Error: Unknown location directive: " + field);
+}
+
+void	LocationConfig::validatePath() const
+{
+	// path 유효성 검사
+	if (this->_path.empty())
+		throw ConfigSemanticException("Error: Location path is empty");
+
+	if (this->_path[0] != '/') // ex) location '/'upload
+		throw ConfigSemanticException("Error: Location path must start whit '/'");
 }
 
 void	LocationConfig::validateLocationBlock()
 {
-	// path 유효성 검사
-	if (this->_path.empty())
-		throw std::runtime_error("Error: Location path is empty");
-	if (this->_path[0] != '/') // ex) location '/'upload
-		throw std::runtime_error("Error: Location path must start whit '/'");
+	validatePath();
 }
 
 const std::string&	LocationConfig::getPath() const

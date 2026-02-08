@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:12 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/28 21:40:16 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/08 06:21:25 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 #define SERVERCONFIG_HPP
 
 #include "Token.hpp" // <string>은 Token.hpp에 있음
+#include "ConfigException.hpp"
 #include <vector>
 #include <stdexcept>
 
@@ -28,6 +29,10 @@ class	ServerConfig
 		void	parseDirective(const std::vector<Token> &tokens, size_t &i);
 		void	addLocation(const LocationConfig &location); // location은 server 내부에 종속: ServerConfig가 관리 및 내부에서 통제 가능(캡슐화)
 		void	validateServerBlock(void); // server block 전체 보고 판단: 의미적으로 완성되었는가, 기본값을 채워야 하는가
+		void	duplicateLocationPathCheck(void) const;
+		void	applyDefaultErrorPage(void);
+		void	applyDefaultRoot(void);
+		void	validateListenDirective(void) const;
 	
 	private:
 		/* semantic handlersfuncs */
