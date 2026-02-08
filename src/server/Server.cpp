@@ -16,32 +16,43 @@ static void fatal(const char* msg) {
 }
 
 Server::Server(const std::vector<ServerConfig>& cfgs)
-: _configs(cfgs), _listenFd(-1), _sidSeq(1) {
-    if (_configs.empty()) {
+: _configs(cfgs), _sidSeq(1) {
+    if (_configs.empty())
         throw std::runtime_error("No server config provided");
-    }
 
-    // 우선 첫 번째 서버 블록의 첫 포트만 사용 (다중 포트는 추후 확장)
-    const std::vector<int>& ports = _configs[0].getListenPorts();
-    if (ports.empty()) {
-        throw std::runtime_error("No listen port configured");
+    // listen 포트 수집 (중복 제거)
+    std::set<int> ports;
+    for (size_t i = 0; i < _configs.size(); ++i) {
+        const std::vector<int>& ps = _configs[i].getListenPorts();
+        ports.insert(ps.begin(), ps.end());
     }
-    _port = ports[0];
+    if (ports.empty())
+        throw std::runtime_error("No listen port configured");
 
     // 기본값 설정 (TODO: config에서 받아오도록 확장)
     _maxConnections = 1024;
     _idleTimeoutSec = 15;
 
-    _listenFd = createListenSocket(_port);
-    setNonBlocking(_listenFd);
+    // 각 포트마다 리스너 생성 및 poll 등록
+    for (std::set<int>::const_iterator it = ports.begin(); it != ports.end(); ++it) {
+        int port = *it;
+        int fd = createListenSocket(port);
+        setNonBlocking(fd);
+        _listenFds.push_back(fd);
+        _listenFdSet.insert(fd);
 
-    pollfd p;
-    p.fd = _listenFd;
-    p.events = POLLIN;
-    p.revents = 0;
-    _pfds.push_back(p);
+        pollfd p;
+        p.fd = fd;
+        p.events = POLLIN;
+        p.revents = 0;
+        _pfds.push_back(p);
 
-    std::cout << "Listening on port " << _port << "\n";
+        // 첫 포트는 기존 코드 호환성/로깅용으로 저장
+        if (it == ports.begin())
+            _port = port;
+
+        std::cout << "Listening on port " << port << "\n";
+    }
 }
 
 Server::~Server() {
@@ -49,7 +60,9 @@ Server::~Server() {
         delete it->second;
     _conns.clear();
 
-    if (_listenFd != -1) ::close(_listenFd);
+    for (size_t i = 0; i < _listenFds.size(); ++i) {
+        if (_listenFds[i] != -1) ::close(_listenFds[i]);
+    }
 }
 
 int Server::createListenSocket(int port) {
@@ -91,8 +104,8 @@ void Server::run() {
         for (size_t i = 0; i < _pfds.size(); /* increment inside */) {
             if (_pfds[i].revents == 0) { ++i; continue; }
 
-            if (i == 0) {
-                if (_pfds[i].revents & POLLIN) acceptLoop();
+            if (isListenFd(_pfds[i].fd)) {
+                if (_pfds[i].revents & POLLIN) acceptLoop(_pfds[i].fd);
                 _pfds[i].revents = 0;
                 ++i;
                 continue;
@@ -108,9 +121,9 @@ void Server::run() {
     }
 }
 
-void Server::acceptLoop() {
+void Server::acceptLoop(int listenFd) {
     while (true) {
-        int cfd = ::accept(_listenFd, NULL, NULL);
+        int cfd = ::accept(listenFd, NULL, NULL);
         if (cfd < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) return;
             perror("accept");
@@ -197,7 +210,8 @@ void Server::handleClientEvent(size_t idx) {
 
 void Server::updatePollEventsFor(int fd) {
     Connection* conn = _conns[fd];
-    for (size_t i = 1; i < _pfds.size(); ++i) {
+    for (size_t i = 0; i < _pfds.size(); ++i) {
+        if (isListenFd(_pfds[i].fd)) continue; // 리스너는 항상 POLLIN 유지
         if (_pfds[i].fd == fd) {
             short e = POLLIN;
             if (conn->hasPendingWrite()) e |= POLLOUT;
@@ -213,7 +227,8 @@ void Server::removeConn(int fd) {
         delete it->second;
         _conns.erase(it);
     }
-    for (size_t i = 1; i < _pfds.size(); ++i) {
+    for (size_t i = 0; i < _pfds.size(); ++i) {
+        if (isListenFd(_pfds[i].fd)) continue; // 리스너는 제거 대상 아님
         if (_pfds[i].fd == fd) {
             _pfds.erase(_pfds.begin() + i);
             break;
@@ -281,6 +296,10 @@ Server::Session& Server::getOrCreateSession(const HTTPRequest& req, HTTPResponse
     Session& s = _sessions[sid];
     s.lastSeen = std::time(NULL);
     return s;
+}
+
+bool Server::isListenFd(int fd) const {
+    return _listenFdSet.find(fd) != _listenFdSet.end();
 }
 
 void Server::onRequest(int fd, const HTTPRequest& req) {
