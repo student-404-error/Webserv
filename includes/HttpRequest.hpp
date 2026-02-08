@@ -16,9 +16,9 @@
 #include <string>
 #include <map>
 
-class HTTPRequest {
+class HttpRequest {
 public:
-    HTTPRequest();
+    HttpRequest();
 
     // raw data 누적 (recv 결과)
     bool appendData(const std::string& data);

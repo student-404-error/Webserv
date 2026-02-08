@@ -176,15 +176,15 @@ void Server::handleClientEvent(size_t idx) {
 
         // Try parse requests as long as possible (pipelining-friendly)
         while (true) {
-            HTTPRequest req;
+            HttpRequest req;
             std::string& in = conn->inBuf();
 
-            // HTTPRequest::appendData를 사용하여 파싱 시도
+            // HttpRequest::appendData를 사용하여 파싱 시도
             bool complete = req.appendData(in);
             if (!complete) break; // need more bytes
 
             if (req.hasError()) {
-                HTTPResponse resp;
+                HttpResponse resp;
                 resp.setStatus(400);
                 resp.setBody("400 Bad Request\n");
                 std::string bytes = resp.toString();
@@ -278,8 +278,8 @@ std::string Server::newSessionId() {
     return oss.str();
 }
 
-Server::Session& Server::getOrCreateSession(const HTTPRequest& req, HTTPResponse& resp) {
-    // HTTPRequest에 cookie 메서드가 없으므로 헤더에서 직접 파싱
+Server::Session& Server::getOrCreateSession(const HttpRequest& req, HttpResponse& resp) {
+    // HttpRequest에 cookie 메서드가 없으므로 헤더에서 직접 파싱
     std::string cookieHeader;
     const std::map<std::string, std::string>& headers = req.getHeaders();
     std::map<std::string, std::string>::const_iterator it = headers.find("cookie");
@@ -313,7 +313,7 @@ bool Server::isListenFd(int fd) const {
     return _listenFdSet.find(fd) != _listenFdSet.end();
 }
 
-void Server::onRequest(int fd, const HTTPRequest& req) {
+void Server::onRequest(int fd, const HttpRequest& req) {
     Connection* conn = _conns[fd];
 
     // keep-alive decision (simple)
@@ -327,7 +327,7 @@ void Server::onRequest(int fd, const HTTPRequest& req) {
         }
     }
 
-    HTTPResponse resp;
+    HttpResponse resp;
 
     // URI에서 경로 추출 (쿼리 스트링 제거)
     std::string uri = req.getURI();

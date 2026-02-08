@@ -54,6 +54,6 @@ class	LocationConfig
 		/* methods */
 		std::vector<std::string>	_methods;
 		bool						_hasMethods;
-}
+};
 
 #endif

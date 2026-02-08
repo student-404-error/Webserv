@@ -16,9 +16,9 @@
 #include <string>
 #include <map>
 
-class HTTPResponse { // 파일 명이랑 통일하는게 좋을듯
+class HttpResponse {
 public:
-    HTTPResponse();
+    HttpResponse();
 
     void setStatus(int code);
     void setHeader(const std::string& key, const std::string& value);
