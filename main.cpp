@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 #include "Config.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
@@ -59,12 +60,14 @@ int main(int argc, char* argv[])
     std::cout << "Press Ctrl+C to stop\n" << std::endl;
 
     try {
+        // 테스트용 ServerConfig 생성
         ServerConfig serverConfig;
-        serverConfig.port = 8080;
-        serverConfig.maxConnections = 100;
-        serverConfig.idleTimeoutSec = 30;
-        
-        Server server(serverConfig);
+        serverConfig.addListenPort(8080);
+
+        std::vector<ServerConfig> servers;
+        servers.push_back(serverConfig);
+
+        Server server(servers);
         server.run();
     } catch (const std::exception& e) {
         std::cerr << "Server error: " << e.what() << std::endl;
