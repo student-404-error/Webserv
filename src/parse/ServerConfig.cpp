@@ -116,6 +116,8 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleRoot(tokens, i);
 	else if (field == "error_page")
 		handleErrorPage(tokens, i);
+	// TODO: server_name 파싱 추가 (다중 값 지원)
+	// TODO: listen host:port 형태 지원 시 IP 파싱 추가
 	else
 		throw std::runtime_error("Error: unknown server directive: " + field);
 }
@@ -147,6 +149,7 @@ void	ServerConfig::validateServerBlock()
 				throw std::runtime_error("Error: Duplicate location path: " + this->_locations[i].getPath() + "\n" + this->_locations[j].getPath());
 		}
 	}
+	// TODO: server_name 기본값/중복 검사 (가상호스트)
 }
 
 

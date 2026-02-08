@@ -30,6 +30,10 @@ private:
     int _idleTimeoutSec;
     int _writeTimeoutSec;
     int _maxKeepAlive;
+    /* TODO: 가상호스트 매핑 추가
+        - 포트별 ServerConfig 리스트 (선언 순서 유지)
+        - (host, port) -> ServerConfig* 빠른 조회 테이블
+    */
 
     std::vector<pollfd> _pfds;               // [0..n) 리스너, 이후 클라이언트
     std::map<int, Connection*> _conns;       // fd -> Connection*

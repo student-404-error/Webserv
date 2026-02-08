@@ -33,6 +33,10 @@ class	ServerConfig
 		const std::string& getRoot(void) const;
 		const std::string& getErrorPage(void) const;
 		const std::vector<LocationConfig>& getLocations(void) const;
+		/* TODO: 가상호스트용 필드/게터 추가 예정
+			- std::vector<std::string> _serverNames;
+			- std::string _host; // listen IP 지정 시
+		*/
 		
 		// For testing/manual setup
 		void addListenPort(int port);

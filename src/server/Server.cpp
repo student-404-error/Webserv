@@ -25,6 +25,7 @@ Server::Server(const std::vector<ServerConfig>& cfgs)
     for (size_t i = 0; i < _configs.size(); ++i) {
         const std::vector<int>& ps = _configs[i].getListenPorts();
         ports.insert(ps.begin(), ps.end());
+        // TODO: 가상호스트 매핑을 위해 포트별 서버 리스트를 별도 컨테이너에 저장
     }
     if (ports.empty())
         throw std::runtime_error("No listen port configured");
@@ -106,12 +107,12 @@ void Server::run() {
         for (size_t i = 0; i < _pfds.size(); /* increment inside */) {
             if (_pfds[i].revents == 0) { ++i; continue; }
 
-            if (isListenFd(_pfds[i].fd)) {
-                if (_pfds[i].revents & POLLIN) acceptLoop(_pfds[i].fd);
-                _pfds[i].revents = 0;
-                ++i;
-                continue;
-            }
+        if (isListenFd(_pfds[i].fd)) {
+            if (_pfds[i].revents & POLLIN) acceptLoop(_pfds[i].fd);
+            _pfds[i].revents = 0;
+            ++i;
+            continue;
+        }
 
             handleClientEvent(i);
             // handleClientEvent may remove current index; safest is to just continue without ++i if removed
