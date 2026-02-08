@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/08 06:24:59 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/08 07:50:36 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -54,29 +54,51 @@ static const Token&	directiveSyntaxCheck(const std::vector<Token>& tokens, size_
 	return tokenValue;
 }
 
-ServerConfig::ServerConfig() {}
+static void	parseListenValue(const std::string& value, std::string& ip, int& port)
+{
+	size_t colon = value.find(':');
+
+	if (colon == std::string::npos)
+	{
+		ip = "0.0.0.0";
+		if (!isNumber(value))
+			throw ConfigSyntaxException("Error: listen: invalid port");
+		port = std::atoi(value.c_str());
+	}
+	else
+	{
+		ip = value.substr(0, colon);
+		std::string portStr = value.substr(colon + 1);
+
+		if (ip.empty() || portStr.empty() || !isNumber(portStr))
+			throw ConfigSyntaxException("Error: listen: invalid ip:port");
+
+		port = std::atoi(portStr.c_str());
+	}
+
+	if (port <= 0 || port > 65535)
+		throw ConfigSemanticException("Error: listen: port out of range");
+}
+
+ServerConfig::ServerConfig() : _root(""), _errorPage(""), _hasMethods(false) {}
 
 ServerConfig::~ServerConfig() {}
 
-void	ServerConfig::handleListen(const std::vector<Token> &tokens, size_t &i)
+void	ServerConfig::handleListen(const std::vector<Token>& tokens, size_t& i)
 {
-	const Token	&portToken = directiveSyntaxCheck(tokens, i, "listen");
+	const Token& value = directiveSyntaxCheck(tokens, i, "listen");
 
-	if (!isNumber(portToken.value))
-		throw ConfigSemanticException("Error: Invalide listen port");
+	std::string ip;
+	int port;
 
-	int	port = std::atoi(protToken.value.c_str());
+	parseListenValue(value.value, ip, port);
+	checkDuplicateListen(ip, port);
 
-	if (port <= 0 || port > 65535)
-		throw ConfigSemanticException("Error: Listen port out of range");
+	ListenAddress	addr;
+	addr.ip = ip;
+	addr.port = port;
 
-	for (size_t j = 0; j < this->_listenPorts.size(); j++)
-	{
-		if (this->_listenPorts[j] == port)
-			throw ConfigSemanticException("Error: Duplicate listen port");
-	}
-
-	this->_listenPorts.push_back(port);
+	this->_listen.push_back(addr);
 }
 
 void	ServerConfig::handleRoot(const std::vector<Token> &tokens, size_t &i)
@@ -91,6 +113,36 @@ void	ServerConfig::handleErrorPage(const std::vector<Token> &tokens, size_t &i)
 	this->_errorPage = pathToken.value;
 }
 
+void	ServerConfig::handleMethods(const std::vector<Token>& tokens, size_t& i)
+{
+	this->_methods.clear();
+	this->_hasMethods = true;
+
+	i++;
+
+	while (i < tokens.size())
+	{
+		if (tokens[i].type == TOKEN_SEMICOLON)
+		{
+			i++;
+			return;
+		}
+
+		if (tokens[i].type != TOKEN_WORD)
+			throw ConfigSyntaxException("Error: methods: invalid token");
+
+		const std::string& met = tokens[i].value;
+
+		if (m != "GET" && met != "POST" && met != "DELETE")
+			throw ConfigSyntaxException("Error: methods: unknown method " + met);
+
+		_methods.push_back(met);
+		i++;
+	}
+
+	throw ConfigSyntaxException("Error: methods: missing ';'");
+}
+
 void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -101,6 +153,8 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleRoot(tokens, i);
 	else if (field == "error_page")
 		handleErrorPage(tokens, i);
+	else if (field == "methods")
+		handleMethods(tokens, i);
 	else
 		throw ConfigSyntaxException("Error: unknown server directive: " + field);
 }
@@ -111,10 +165,19 @@ void	ServerConfig::addLocation(const LocationConfig &location)
 	this->_locations.push_back(location);
 }
 
+void	ServerConfig::checkDuplicateListen(const std::string& ip, int port) const
+{
+	for (size_t i = 0; i < _listen.size(); i++)
+	{
+		if (this->_listen[i].ip == ip && this->_listen[i].port == port)
+			throw ConfigSemanticException("Error: duplicate listen directive" );
+	}
+}
+
 void	ServerConfig::validateListenDirective() const
 {
 	if (this->_listenPorts.empty())
-		throw ConfigSyntaxException("Error: Server block must contain at least 1 listen directive");
+		throw ConfigSemanticException("Error: Server block must contain at least 1 listen directive");
 }
 
 void	ServerConfig::applyDefaultRoot()
@@ -136,11 +199,10 @@ void	ServerConfig::duplicateLocationPathCheck() const
 		for (size_t j = (i + 1); j < this->_locations.size(); ++j)
 		{
 			if (this->_locations[i].getPath() == this->_locations[j].getPath())
-				throw ConfigSyntaxException("Error: Duplicate location path: " + this->_locations[i].getPath() + "\n" + this->_locations[j].getPath());
+				throw ConfigSemanticException("Error: Duplicate location path: " + this->_locations[i].getPath() + "\n" + this->_locations[j].getPath());
 		}
 	}	
 }
-
 
 void	ServerConfig::validateServerBlock()
 {
@@ -150,3 +212,11 @@ void	ServerConfig::validateServerBlock()
 	duplicateLocationPathCheck(); // 4) location path 중복 검사
 }
 
+/* getter */
+const std::string&	ServerConfig::getRoot(void) const { return _root; }
+
+const std::string&	ServerConfig::getErrorPage(void) const { return _errorPage; }
+
+bool	ServerConfig::hasMethods(void) const { return _hasMethods; }
+
+const std::vector<std::string>&	ServerConfig::getMethods(void) const { return _methods; }
