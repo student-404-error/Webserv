@@ -6,7 +6,7 @@
 /*   By: jaoh <jaoh@student.42.fr>                  +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/20 16:27:19 by jaoh              #+#    #+#             */
-/*   Updated: 2026/01/29 16:53:15 by jaoh             ###   ########.fr       */
+/*   Updated: 2026/02/08 14:53:31 by jaoh             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,9 +16,9 @@
 #include <string>
 #include <map>
 
-class HTTPResponse {
+class HttpResponse {
 public:
-    HTTPResponse();
+    HttpResponse();
 
     void setStatus(int code);
     void setHeader(const std::string& key, const std::string& value);

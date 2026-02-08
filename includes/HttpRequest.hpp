@@ -6,7 +6,7 @@
 /*   By: jaoh <jaoh@student.42.fr>                  +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/20 16:24:57 by jaoh              #+#    #+#             */
-/*   Updated: 2026/01/29 16:53:21 by jaoh             ###   ########.fr       */
+/*   Updated: 2026/02/08 14:53:31 by jaoh             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,9 +16,9 @@
 #include <string>
 #include <map>
 
-class HTTPRequest {
+class HttpRequest {
 public:
-    HTTPRequest();
+    HttpRequest();
 
     // raw data 누적 (recv 결과)
     bool appendData(const std::string& data);
