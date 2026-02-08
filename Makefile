@@ -3,6 +3,8 @@ SRCS = main.cpp \
        src/http/HttpResponse.cpp \
        src/parse/Config.cpp \
        src/parse/ConfigTokenizer.cpp \
+       src/parse/ServerConfig.cpp \
+       src/parse/LocationConfig.cpp \
        src/server/Connection.cpp \
        src/server/Server.cpp
 

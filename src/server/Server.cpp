@@ -15,18 +15,47 @@ static void fatal(const char* msg) {
     std::exit(1);
 }
 
-Server::Server(const ServerConfig& cfg)
-: _cfg(cfg), _listenFd(-1), _sidSeq(1) {
-    _listenFd = createListenSocket(_cfg.port);
-    setNonBlocking(_listenFd);
+Server::Server(const std::vector<ServerConfig>& cfgs)
+: _configs(cfgs), _sidSeq(1) {
+    if (_configs.empty())
+        throw std::runtime_error("No server config provided");
 
-    pollfd p;
-    p.fd = _listenFd;
-    p.events = POLLIN;
-    p.revents = 0;
-    _pfds.push_back(p);
+    // listen 포트 수집 (중복 제거)
+    std::set<int> ports;
+    for (size_t i = 0; i < _configs.size(); ++i) {
+        const std::vector<int>& ps = _configs[i].getListenPorts();
+        ports.insert(ps.begin(), ps.end());
+        // TODO: 가상호스트 매핑을 위해 포트별 서버 리스트를 별도 컨테이너에 저장
+    }
+    if (ports.empty())
+        throw std::runtime_error("No listen port configured");
 
-    std::cout << "Listening on port " << _cfg.port << "\n";
+    // 기본값 설정 (TODO: config에서 받아오도록 확장)
+    _maxConnections = 1024;
+    _idleTimeoutSec = 15;   // idle/read timeout 기본값
+    _writeTimeoutSec = 10;  // 쓰기 지연 기본값
+    _maxKeepAlive = 100;    // 연결당 최대 요청 수
+
+    // 각 포트마다 리스너 생성 및 poll 등록
+    for (std::set<int>::const_iterator it = ports.begin(); it != ports.end(); ++it) {
+        int port = *it;
+        int fd = createListenSocket(port);
+        setNonBlocking(fd);
+        _listenFds.push_back(fd);
+        _listenFdSet.insert(fd);
+
+        pollfd p;
+        p.fd = fd;
+        p.events = POLLIN;
+        p.revents = 0;
+        _pfds.push_back(p);
+
+        // 첫 포트는 기존 코드 호환성/로깅용으로 저장
+        if (it == ports.begin())
+            _port = port;
+
+        std::cout << "Listening on port " << port << "\n";
+    }
 }
 
 Server::~Server() {
@@ -34,7 +63,9 @@ Server::~Server() {
         delete it->second;
     _conns.clear();
 
-    if (_listenFd != -1) ::close(_listenFd);
+    for (size_t i = 0; i < _listenFds.size(); ++i) {
+        if (_listenFds[i] != -1) ::close(_listenFds[i]);
+    }
 }
 
 int Server::createListenSocket(int port) {
@@ -76,12 +107,12 @@ void Server::run() {
         for (size_t i = 0; i < _pfds.size(); /* increment inside */) {
             if (_pfds[i].revents == 0) { ++i; continue; }
 
-            if (i == 0) {
-                if (_pfds[i].revents & POLLIN) acceptLoop();
-                _pfds[i].revents = 0;
-                ++i;
-                continue;
-            }
+        if (isListenFd(_pfds[i].fd)) {
+            if (_pfds[i].revents & POLLIN) acceptLoop(_pfds[i].fd);
+            _pfds[i].revents = 0;
+            ++i;
+            continue;
+        }
 
             handleClientEvent(i);
             // handleClientEvent may remove current index; safest is to just continue without ++i if removed
@@ -93,16 +124,16 @@ void Server::run() {
     }
 }
 
-void Server::acceptLoop() {
+void Server::acceptLoop(int listenFd) {
     while (true) {
-        int cfd = ::accept(_listenFd, NULL, NULL);
+        int cfd = ::accept(listenFd, NULL, NULL);
         if (cfd < 0) {
             if (errno == EAGAIN || errno == EWOULDBLOCK) return;
             perror("accept");
             return;
         }
 
-        if ((int)_conns.size() >= _cfg.maxConnections) {
+        if ((int)_conns.size() >= _maxConnections) {
             ::close(cfd);
             continue;
         }
@@ -165,10 +196,15 @@ void Server::handleClientEvent(size_t idx) {
             // 파싱 성공 - 처리된 데이터는 버퍼에서 제거해야 함
             // 간단하게 전체 버퍼를 클리어 (단일 요청 처리)
             in.clear();
-            
+
+            conn->incRequestCount();
             onRequest(fd, req);
             // if handler queued write and wants close, we may stop parsing more
             if (conn->shouldCloseAfterWrite()) break;
+            if (conn->requestCount() >= _maxKeepAlive) {
+                conn->closeAfterWrite();
+                break;
+            }
         }
     }
 
@@ -182,7 +218,8 @@ void Server::handleClientEvent(size_t idx) {
 
 void Server::updatePollEventsFor(int fd) {
     Connection* conn = _conns[fd];
-    for (size_t i = 1; i < _pfds.size(); ++i) {
+    for (size_t i = 0; i < _pfds.size(); ++i) {
+        if (isListenFd(_pfds[i].fd)) continue; // 리스너는 항상 POLLIN 유지
         if (_pfds[i].fd == fd) {
             short e = POLLIN;
             if (conn->hasPendingWrite()) e |= POLLOUT;
@@ -198,7 +235,8 @@ void Server::removeConn(int fd) {
         delete it->second;
         _conns.erase(it);
     }
-    for (size_t i = 1; i < _pfds.size(); ++i) {
+    for (size_t i = 0; i < _pfds.size(); ++i) {
+        if (isListenFd(_pfds[i].fd)) continue; // 리스너는 제거 대상 아님
         if (_pfds[i].fd == fd) {
             _pfds.erase(_pfds.begin() + i);
             break;
@@ -213,8 +251,11 @@ void Server::sweepTimeouts() {
 
     for (std::map<int, Connection*>::iterator it = _conns.begin(); it != _conns.end(); ++it) {
         Connection* c = it->second;
-        if ((int)(now - c->lastActive()) > _cfg.idleTimeoutSec) {
-            toClose.push_back(it->first);
+        int idle = static_cast<int>(now - c->lastActive());
+        if (!c->hasPendingWrite()) {
+            if (idle > _idleTimeoutSec) toClose.push_back(it->first);
+        } else {
+            if (idle > _writeTimeoutSec) toClose.push_back(it->first);
         }
     }
     for (size_t i = 0; i < toClose.size(); ++i) removeConn(toClose[i]);
@@ -266,6 +307,10 @@ Server::Session& Server::getOrCreateSession(const HTTPRequest& req, HTTPResponse
     Session& s = _sessions[sid];
     s.lastSeen = std::time(NULL);
     return s;
+}
+
+bool Server::isListenFd(int fd) const {
+    return _listenFdSet.find(fd) != _listenFdSet.end();
 }
 
 void Server::onRequest(int fd, const HTTPRequest& req) {

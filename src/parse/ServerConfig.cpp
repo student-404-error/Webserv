@@ -153,6 +153,8 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleRoot(tokens, i);
 	else if (field == "error_page")
 		handleErrorPage(tokens, i);
+	// TODO: server_name 파싱 추가 (다중 값 지원)
+	// TODO: listen host:port 형태 지원 시 IP 파싱 추가
 	else if (field == "methods")
 		handleMethods(tokens, i);
 	else
@@ -201,6 +203,46 @@ void	ServerConfig::duplicateLocationPathCheck() const
 			if (this->_locations[i].getPath() == this->_locations[j].getPath())
 				throw ConfigSemanticException("Error: Duplicate location path: " + this->_locations[i].getPath() + "\n" + this->_locations[j].getPath());
 		}
+	}
+	// TODO: server_name 기본값/중복 검사 (가상호스트)
+}
+
+
+/* Getters */
+const std::vector<int>& ServerConfig::getListenPorts() const
+{
+	return this->_listenPorts;
+}
+
+const std::string& ServerConfig::getRoot() const
+{
+	return this->_root;
+}
+
+const std::string& ServerConfig::getErrorPage() const
+{
+	return this->_errorPage;
+}
+
+const std::vector<LocationConfig>& ServerConfig::getLocations() const
+{
+	return this->_locations;
+}
+
+/* For testing/manual setup */
+void ServerConfig::addListenPort(int port)
+{
+	if (port <= 0 || port > 65535)
+		throw std::runtime_error("Error: Listen port out of range");
+	
+	for (size_t j = 0; j < this->_listenPorts.size(); j++)
+	{
+		if (this->_listenPorts[j] == port)
+			throw std::runtime_error("Error: Duplicate listen port");
+	}
+	
+	this->_listenPorts.push_back(port);
+}
 	}	
 }
 
@@ -213,10 +255,7 @@ void	ServerConfig::validateServerBlock()
 }
 
 /* getter */
-const std::string&	ServerConfig::getRoot(void) const { return _root; }
 
-const std::string&	ServerConfig::getErrorPage(void) const { return _errorPage; }
+bool	ServerConfig::hasMethods(void) const { return this->_hasMethods; }
 
-bool	ServerConfig::hasMethods(void) const { return _hasMethods; }
-
-const std::vector<std::string>&	ServerConfig::getMethods(void) const { return _methods; }
+const std::vector<std::string>&	ServerConfig::getMethods(void) const { return this->_methods; }
