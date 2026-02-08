@@ -31,6 +31,10 @@ public:
     void closeAfterWrite();
     bool shouldCloseAfterWrite() const;
 
+    // keep-alive 관리용
+    void incRequestCount();
+    int requestCount() const;
+
     void touch();
     std::time_t lastActive() const;
 
@@ -44,6 +48,7 @@ private:
 
     bool _closeAfterWrite;
     std::time_t _lastActive;
+    int _requestsHandled;
 
     Connection(const Connection&);
     Connection& operator=(const Connection&);

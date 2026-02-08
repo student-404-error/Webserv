@@ -5,7 +5,8 @@
 #include <sys/socket.h>
 
 Connection::Connection(int fd)
-: _fd(fd), _state(READING), _outPos(0), _closeAfterWrite(false), _lastActive(std::time(NULL)) {}
+: _fd(fd), _state(READING), _outPos(0), _closeAfterWrite(false),
+  _lastActive(std::time(NULL)), _requestsHandled(0) {}
 
 Connection::~Connection() {
     if (_fd != -1) ::close(_fd);
@@ -42,6 +43,9 @@ bool Connection::shouldCloseAfterWrite() const { return _closeAfterWrite; }
 
 void Connection::touch() { _lastActive = std::time(NULL); }
 std::time_t Connection::lastActive() const { return _lastActive; }
+
+void Connection::incRequestCount() { ++_requestsHandled; }
+int Connection::requestCount() const { return _requestsHandled; }
 
 bool Connection::onReadable() {
     // Maximum input buffer size to prevent unbounded memory growth (e.g., 1MB)
