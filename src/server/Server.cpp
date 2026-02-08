@@ -15,9 +15,24 @@ static void fatal(const char* msg) {
     std::exit(1);
 }
 
-Server::Server(const ServerConfig& cfg)
-: _cfg(cfg), _listenFd(-1), _sidSeq(1) {
-    _listenFd = createListenSocket(_cfg.port);
+Server::Server(const std::vector<ServerConfig>& cfgs)
+: _configs(cfgs), _listenFd(-1), _sidSeq(1) {
+    if (_configs.empty()) {
+        throw std::runtime_error("No server config provided");
+    }
+
+    // 우선 첫 번째 서버 블록의 첫 포트만 사용 (다중 포트는 추후 확장)
+    const std::vector<int>& ports = _configs[0].getListenPorts();
+    if (ports.empty()) {
+        throw std::runtime_error("No listen port configured");
+    }
+    _port = ports[0];
+
+    // 기본값 설정 (TODO: config에서 받아오도록 확장)
+    _maxConnections = 1024;
+    _idleTimeoutSec = 15;
+
+    _listenFd = createListenSocket(_port);
     setNonBlocking(_listenFd);
 
     pollfd p;
@@ -26,7 +41,7 @@ Server::Server(const ServerConfig& cfg)
     p.revents = 0;
     _pfds.push_back(p);
 
-    std::cout << "Listening on port " << _cfg.port << "\n";
+    std::cout << "Listening on port " << _port << "\n";
 }
 
 Server::~Server() {
@@ -102,7 +117,7 @@ void Server::acceptLoop() {
             return;
         }
 
-        if ((int)_conns.size() >= _cfg.maxConnections) {
+        if ((int)_conns.size() >= _maxConnections) {
             ::close(cfd);
             continue;
         }
@@ -213,7 +228,7 @@ void Server::sweepTimeouts() {
 
     for (std::map<int, Connection*>::iterator it = _conns.begin(); it != _conns.end(); ++it) {
         Connection* c = it->second;
-        if ((int)(now - c->lastActive()) > _cfg.idleTimeoutSec) {
+        if ((int)(now - c->lastActive()) > _idleTimeoutSec) {
             toClose.push_back(it->first);
         }
     }
