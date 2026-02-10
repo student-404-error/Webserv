@@ -6,17 +6,12 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/25 16:03:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 16:20:21 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 16:58:30 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Config.hpp"
 #include "LocationConfig.hpp"
-
-/* TODO) 
-	1. 예외처리 따로 만들어주기
-	2. validateServerBlock() / validateLocationBlock() 리팩토링 
-	3. 지시문 syntax 검증 -> semantic parser에 넣기*/
 
 Config::Config(const std::string &filePath)
 {
@@ -43,24 +38,6 @@ std::string	Config::openConfigFile(const std::string &filePath)
 	return buffer.str();
 }
 
-/* i: directive의 첫 token_word를 가리켜야 함, ';'까지 문법 검증 */
-/*void	Config::validateDirective(size_t &i)
-{
-	while (i < this->_tokens.size())
-	{
-		if (this->_tokens[i].type == TOKEN_SEMICOLON)
-		{
-			i++;
-			return ; // 정상종료 : 세미콜론까지 설정 한 줄 (ex: isten 8080;)
-		}
-		if (this->_tokens[i].type == TOKEN_RBRACE)
-			throw std::runtime_error("Error: missing ';' before '}'");
-		i++;
-	}
-	// EOF (세미콜론 없음)
-	throw std::runtime_error("Error: missing ';' at end of directive");
-}*/
-
 void	Config::configParse()
 {
 	LocationConfig	*currentLocation = 0; // location은 있을수도 있고, 없을 수도 있음(생성자 만들지 않음, 그래서 pointer 변수)
@@ -72,6 +49,9 @@ void	Config::configParse()
 		ServerConfig	currentServer; // 현재 server block
 		bool	serverOpened = false;
 		bool	locationOpened = false;
+		bool	expectingServerBrace = false;
+		bool	expectingLocationBrace = false;
+
 
 		while (i < this->_tokens.size())
 		{
@@ -85,6 +65,7 @@ void	Config::configParse()
 				{
 					currentServer = ServerConfig(); // 새 서버 시작(생성)
 					serverOpened = false;
+					expectingServerBrace = true;
 					state = STATE_SERVER;
 					i++;
 					continue ;
@@ -92,36 +73,43 @@ void	Config::configParse()
 				else if (token.type == TOKEN_EOF)
 				{
 					if (serverOpened)
-						throw std::runtime_error("Error: unclosed server block at end of file");
+						throw ConfigSyntaxException("Error: unclosed server block at end of file");
 				
 					if (locationOpened)
-						throw std::runtime_error("Error: unclosed location block at end of file");
+						throw ConfigSyntaxException("Error: unclosed location block at end of file");
 				
 					break ;
 				}
 				else
-					throw std::runtime_error("Error: unexpected '{' outside server block");
+					throw ConfigSyntaxException("Error: unexpected '{' outside server block");
 			}
 			// server state
 			else if (state == STATE_SERVER)
 			{
 				if (token.type == TOKEN_LBRACE) // {
 				{
+					if (!expectingServerBrace)
+						throw ConfigSyntaxException("Error: unexpected '{' in server block");
+					
 					if (serverOpened)
-						throw std::runtime_error("Error: duplicate '{' in server block");
+						throw ConfigSyntaxException("Error: duplicate '{' in server block");
 				
 					serverOpened = true;
+					expectingLocationBrace = false;
 					i++;
 					continue ;
 				}
 				else if (token.type == TOKEN_RBRACE) // }
 				{
 					if (!serverOpened)
-						throw std::runtime_error("Error: '}' without matching '{' in server block");
+						throw ConfigSyntaxException("Error: '}' without matching '{' in server block");
 				
 					if (locationOpened)
-						throw std::runtime_error("Error: unclosed location block before server end");
+						throw ConfigSyntaxException("Error: unclosed location block before server end");
 					
+					if (expectingServerBrace)
+						throw ConfigSyntaxException("Error: server block missing '{'");
+
 					// server semantic 유효성 검사: 예외가 아니면 다음에 server 저장으로 간다
 					currentServer.validateServerBlock();
 					
@@ -134,15 +122,16 @@ void	Config::configParse()
 				else if (token.type == TOKEN_WORD && token.value == "location")
 				{
 					if (!serverOpened)
-						throw std::runtime_error("Error: location outside server block"); // '{' 없는 server 통과 가능성 있음
+						throw ConfigSyntaxException("Error: location outside server block"); // '{' 없는 server 통과 가능성 있음
 			
 					if ((i + 1) >= this->_tokens.size() || this->_tokens[i + 1].type != TOKEN_WORD) // 다음 token이 없거나 타입이 다른지 미리 syntax 검사
-						throw std::runtime_error("Error: location requires a path");
+						throw ConfigSyntaxException("Error: location requires a path");
 
 					std::string	path = this->_tokens[i + 1].value; // 다음 토큰이 path여야함: ex) /upload
 					currentLocation = new LocationConfig(path); // path를 가진 location 객체 생성
-					// locationOpened == true  → '{'를 이미 만난 상태
-					// locationOpened == false → 아직 '{'를 만나지 않은 상태
+					// locationOpened == true  -> '{'를 이미 만난 상태
+					// locationOpened == false -> 아직 '{'를 만나지 않은 상태
+					expectingLocationBrace = true;
 					locationOpened = false;
 					i += 2; // location + path
 					state = STATE_LOCATION;
@@ -151,33 +140,40 @@ void	Config::configParse()
 				else if (token.type == TOKEN_WORD)
 				{
 					if (!serverOpened)
-						throw std::runtime_error("Error: directive before '{' in server block");
+						throw ConfigSyntaxException("Error: missing '{' after server");
 					currentServer.parseDirective(this->_tokens, i);
 					continue ;
 				}
 				else
-					throw std::runtime_error("Error: Invalid token in SERVER scope");
+					throw ConfigSyntaxException("Error: Invalid token in SERVER scope");
 			}
 			// location
 			else if (state == STATE_LOCATION)
 			{
 				if (!currentLocation) // 안전 검사
-					throw std::runtime_error("Error: Location state without location object");
+					throw ConfigSyntaxException("Error: Location state without location object");
 
 				if (token.type == TOKEN_LBRACE)
 				{
+					if (!expectingLocationBrace)
+						throw ConfigSyntaxException("Error: unexpected '{' in location block");
+
 					if (locationOpened)
-						throw std::runtime_error("Error: duplicate '{' in location block");
+						throw ConfigSyntaxException("Error: duplicate '{' in location block");
 				
 					locationOpened = true;
+					expectingLocationBrace = false;
 					i++;
 					continue ;
 				}
 				else if (token.type == TOKEN_RBRACE)
 				{
 					if (!locationOpened)
-						throw std::runtime_error("Error: '}' without matching '{' in location block");
+						throw ConfigSyntaxException("Error: '}' without matching '{' in location block");
 			
+					if (expectingLocationBrace)
+						throw ConfigSyntaxException("Error: location block missing '{'");
+
 					currentLocation->validateLocationBlock(); // location semantic 유효성 검사
 					
 					currentServer.addLocation(*currentLocation);
@@ -192,13 +188,13 @@ void	Config::configParse()
 				else if (token.type == TOKEN_WORD)
 				{
 					if (!locationOpened)
-						throw std::runtime_error("Error: directive before '{' in location block");
+						throw ConfigSyntaxException("Error: missing '{' after location path");
 	
 					currentLocation->parseDirective(this->_tokens, i);
 					continue ;
 				}
 				else
-					throw std::runtime_error("Error: Invalid token in LOCATION scope");
+					throw ConfigSyntaxException("Error: Invalid token in LOCATION scope");
 			}
 		}
 	}
