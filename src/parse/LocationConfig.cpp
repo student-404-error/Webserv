@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:37 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 04:36:51 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 04:47:36 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -176,6 +176,21 @@ void LocationConfig::handleAllowMethods(const std::vector<Token>& tokens, size_t
 	throw ConfigSyntaxException("Error: allow_methods: missing ';'");
 }
 
+/* 문법: upload_store /var/www/uploads; */
+void	LocationConfig::handleUploadStore(const std::vector<Token>& tokens, size_t& i)
+{
+	if (this->_hasUploadStore)
+		throw ConfigSemanticException("Error: duplicate upload_store directive");
+
+	const Token& uploadValue = directiveSyntaxCheck(tokens, i, "upload_store");
+
+	if (uploadValue.value.empty())
+		throw ConfigSemanticException("Error: upload_store path is empty");
+
+	this->_uploadStore = uploadValue.value;
+	this->_hasUploadStore = true;
+}
+
 void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -192,6 +207,8 @@ void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleMethods(tokens, i);
 	else if (field == "allow_methods")
 		handleAllowMethods(tokens, i);
+	else if (field == "upload_store")
+		handleUploadStore(tokens, i);
 	else
 		throw ConfigSemanticException("Error: Unknown location directive: " + field);
 }
@@ -233,3 +250,7 @@ const Redirect&	LocationConfig::getRedirect(void) const { return this->_redirect
 bool	LocationConfig::hasAllowMethods(void) const { return this->_hasAllowMethods; }
 
 const std::vector<std::string>& LocationConfig::getAllowMethods(void) const { return this->_allowMethods; }
+
+bool	LocationConfig::hasUploadStore(void) const { return this->_hasUploadStore; } // true or false
+
+const std::string&	LocationConfig::getUploadStore(void) const { return this->_uploadStore; } // "/tmp/uploads"

@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:24 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 04:35:38 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 04:42:47 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -44,8 +44,9 @@ class	LocationConfig
 		const Redirect&					getRedirect(void) const;
 		bool							hasAllowMethods(void) const;
 		const std::vector<std::string>&	getAllowMethods(void) const;
+		bool							hasUploadStore(void) const;
+		const std::string&				getUploadStore(void) const;
 
-	
 	private:
 		/* 지시문 handlers funcs */
 		void	handleRoot(const std::vector<Token> &tokens, size_t &i);
@@ -54,6 +55,7 @@ class	LocationConfig
 		void	handleIndex(const std::vector<Token>& tokens, size_t& i);
 		void	handleReturn(const std::vector<Token>& tokens, size_t& i);
 		void	handleAllowMethods(const std::vector<Token>& tokens, size_t& i);
+		void	handleUploadStore(const std::vector<Token>& tokens, size_t& i);
 
 		void	validatePath(void) const;
 	
@@ -77,6 +79,9 @@ class	LocationConfig
 		std::vector<std::string>	_allowMethods;
 		bool						_hasAllowMethods;
 
+		/* location 전용 (server에는 없음) */
+		std::string					_uploadStore;
+		bool						_hasUploadStore;
 };
 
 #endif
