@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 04:37:46 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 16:39:36 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,7 +20,6 @@ static const size_t			MAX_CLIENT_BODY_SIZE = 100000000; // 100MB (임시로 넣�
 
 
 /* 공통 helper func */
-
 static void	parseListenValue(const std::string& value, std::string& ip, int& port)
 {
 	size_t colon = value.find(':');
@@ -291,8 +290,6 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleRoot(tokens, i);
 	else if (field == "error_page")
 		handleErrorPage(tokens, i);
-	// TODO: listen host:port 형태 지원 시 IP 파싱 추가: -> ip 파싱?? 다시 확인해보기
-	// TODO: server_name 파싱 추가 (다중 값 지원): 완료(O)
 	else if (field == "server_name")
 		handleServerName(tokens, i);
 	else if (field == "client_max_body_size")
@@ -352,7 +349,6 @@ void	ServerConfig::duplicateLocationPathCheck() const
 				throw ConfigSemanticException("Error: Duplicate location path: " + this->_locations[i].getPath() + "\n" + this->_locations[j].getPath());
 		}
 	}
-	// TODO: server_name 기본값/중복 검사 (가상호스트)
 }
 
 
@@ -382,7 +378,8 @@ const std::vector<LocationConfig>& ServerConfig::getLocations() const
 }
 
 /* validateServerBlock(): 필수인데 빠지면 서버가 동작 불가능한 것들 조건 검사
-	(server_name은 필수가 아니라서(server_name은 기본값 없음) 넣지 않음: parseDirective에서 field로 있으면 넣기) */
+	(server_name은 필수가 아니라서(server_name은 기본값 없음) 넣지 않음: parseDirective에서 field로 있으면 넣기) 
+	필수 검사만 수행하는 함수 */
 void	ServerConfig::validateServerBlock()
 {
 	validateListenDirective(); // 1) listen 필수 검사
@@ -394,7 +391,6 @@ void	ServerConfig::validateServerBlock()
 }
 
 /* getter */
-
 bool	ServerConfig::hasMethods(void) const { return this->_hasMethods; }
 
 const std::vector<std::string>&	ServerConfig::getMethods(void) const { return this->_methods; }

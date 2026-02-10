@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:12 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 04:35:24 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 16:23:55 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -42,9 +42,9 @@ class	ServerConfig
 		bool							hasMethods(void) const;
 		const std::vector<std::string>&	getMethods(void) const;
 		
-		/* TODO: 가상호스트용 필드/게터 추가 예정
+		/* TODO: 가상호스트용 필드/게터 추가 예정: 완료
 			- std::vector<std::string> _serverNames; (O)
-			- std::string _host; // listen IP 지정 시
+			- std::string _host; // 확장 IP 유효성 검사(IPv4/호스트 이름/IPv6) - 파서의 범위 벗어남 (O)
 		*/
 	
 		/* getter */

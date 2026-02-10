@@ -6,13 +6,11 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:37 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 04:55:58 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 16:37:03 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "LocationConfig.hpp"
-
-/* 공통 helper 함수 (리팩토링) */
 
 LocationConfig::LocationConfig(const std::string &path) : _path(path), _root(""), _rootSet(false), _autoindex(false), _autoindexSet(false), _hasMethods(false) {}
 
@@ -265,6 +263,7 @@ void	LocationConfig::validatePath() const
 		throw ConfigSemanticException("Error: Location path must start whit '/'");
 }
 
+/* 필수 검사만 수행하는 함수 */
 void	LocationConfig::validateLocationBlock()
 {
 	validatePath();
