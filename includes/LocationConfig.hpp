@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:24 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 04:42:47 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 04:54:54 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,7 @@
 #include "ConfigTypes.hpp"
 #include "ConfigUtils.hpp"
 #include <vector>
+#include <map>
 
 class	LocationConfig
 {
@@ -46,6 +47,9 @@ class	LocationConfig
 		const std::vector<std::string>&	getAllowMethods(void) const;
 		bool							hasUploadStore(void) const;
 		const std::string&				getUploadStore(void) const;
+		bool							hasCgiPass(void) const;
+		const std::map<std::string, std::string>&	getCgiPass(void) const;
+
 
 	private:
 		/* 지시문 handlers funcs */
@@ -56,6 +60,7 @@ class	LocationConfig
 		void	handleReturn(const std::vector<Token>& tokens, size_t& i);
 		void	handleAllowMethods(const std::vector<Token>& tokens, size_t& i);
 		void	handleUploadStore(const std::vector<Token>& tokens, size_t& i);
+		void	handleCgiPass(const std::vector<Token>& tokens, size_t& i);
 
 		void	validatePath(void) const;
 	
@@ -82,6 +87,11 @@ class	LocationConfig
 		/* location 전용 (server에는 없음) */
 		std::string					_uploadStore;
 		bool						_hasUploadStore;
+
+		/* cgi_pass (location 전용) */
+		std::map<std::string, std::string>	_cgiPass;
+		bool								_hasCgiPass;
+
 };
 
 #endif
