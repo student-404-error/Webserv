@@ -6,32 +6,13 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:37 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 03:04:18 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 04:00:39 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "LocationConfig.hpp"
 
 /* 공통 helper 함수 (리팩토링) */
-static const Token&	directiveSyntaxCheck(const std::vector<Token>& tokens, size_t& i, const std::string& directiveName)
-{
-	if ((i + 1) >= tokens.size())
-		throw ConfigSyntaxException("Error: " + directiveName + " requires an argument");
-	
-	const Token	&tokenValue = tokens[i + 1]; // token values
-	
-	if (tokenValue.type != TOKEN_WORD)
-		throw ConfigSyntaxException("Error: Invalid argument for " + directiveName);
-	
-	i += 2;
-
-	if (tokens[i].type != TOKEN_SEMICOLON)
-		throw ConfigSyntaxException("Error: missing ';' after " + directiveName);
-	
-	i++;
-
-	return tokenValue;
-}
 
 LocationConfig::LocationConfig(const std::string &path) : _path(path), _root(""), _rootSet(false), _autoindex(false), _autoindexSet(false), _hasMethods(false) {}
 
@@ -126,6 +107,38 @@ void	LocationConfig::handleIndex(const std::vector<Token>& tokens, size_t& i)
 	throw ConfigSyntaxException("Error: index: missing ';'");
 }
 
+void	LocationConfig::handleReturn(const std::vector<Token>& tokens, size_t& i)
+{
+	if (this->_hasRedirect)
+		throw ConfigSemanticException("Error: duplicate return directive");
+
+	i++; // "return"
+
+	if (i >= tokens.size() || tokens[i].type != TOKEN_WORD || !isNumber(tokens[i].value))
+		throw ConfigSyntaxException("Error: return requires status code");
+
+	int status = std::atoi(tokens[i].value.c_str());
+	if (status < 300 || status > 399)
+		throw ConfigSemanticException("Error: return status must be 3xx");
+
+	i++;
+
+	if (i >= tokens.size() || tokens[i].type != TOKEN_WORD)
+		throw ConfigSyntaxException("Error: return requires target");
+
+	std::string target = tokens[i].value;
+	i++;
+
+	if (i >= tokens.size() || tokens[i].type != TOKEN_SEMICOLON)
+		throw ConfigSyntaxException("Error: missing ';' after return");
+
+	i++;
+
+	this->_redirect.status = status;
+	this->_redirect.target = target;
+	this->_hasRedirect = true;
+}
+
 void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -136,6 +149,8 @@ void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleAutoindex(tokens, i);
 	else if (field == "index")
 		handleIndex(tokens, i);
+	else if (field == "return")
+		handleReturn(tokens, i);
 	else if (field == "methods")
 		handleMethods(tokens, i);
 	else
@@ -171,3 +186,7 @@ bool	LocationConfig::getAutoindex(void) const { return this->_autoindex; }
 bool	LocationConfig::hasMethods(void) const { return this->_hasMethods; }
 
 const std::vector<std::string>&	LocationConfig::getMethods(void) const { return this->_methods; }
+
+bool	LocationConfig::hasRedirect(void) const { return this->_hasRedirect; }
+
+const Redirect&	LocationConfig::getRedirect(void) const { return this->_redirect; }

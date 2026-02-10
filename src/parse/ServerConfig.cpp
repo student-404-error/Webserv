@@ -6,14 +6,11 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 03:04:02 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 04:14:43 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "ServerConfig.hpp"
-#include "LocationConfig.hpp" // 헤더에 "LocationConfig라는 타입이 있다"만 알고 내부 구조 모름 (전방 선언)
-#include <cstdlib>
-#include <cctype>
 
 /* TODO) 임시로 넣은 기본 경로 (semantic validation 목적) / 팀 협의 필요 */
 static const std::string	DEFAULT_SERVER_ROOT = "./www";
@@ -23,39 +20,6 @@ static const size_t			MAX_CLIENT_BODY_SIZE = 100000000; // 100MB (임시로 넣�
 
 
 /* 공통 helper func */
-static bool	isNumber(const std::string &s)
-{
-	if (s.empty())
-		return false;
-	
-	for (size_t i = 0; i < s.size(); i++)
-	{
-		if (!std::isdigit(s[i]))
-			return false;
-	}
-
-	return true;
-}
-
-static const Token&	directiveSyntaxCheck(const std::vector<Token>& tokens, size_t& i, const std::string& directiveName)
-{
-	if ((i + 1) >= tokens.size())
-		throw ConfigSyntaxException("Error: " + directiveName + " requires an argument");
-	
-	const Token	&tokenValue = tokens[i + 1]; // token values
-	
-	if (tokenValue.type != TOKEN_WORD)
-		throw ConfigSyntaxException("Error: Invalid argument for " + directiveName);
-	
-	i += 2;
-
-	if (tokens[i].type != TOKEN_SEMICOLON)
-		throw ConfigSyntaxException("Error: missing ';' after " + directiveName);
-	
-	i++;
-
-	return tokenValue;
-}
 
 static void	parseListenValue(const std::string& value, std::string& ip, int& port)
 {
@@ -244,6 +208,42 @@ void	ServerConfig::handleIndex(const std::vector<Token>& tokens, size_t& i)
 	throw ConfigSyntaxException("Error: index: missing ';'");
 }
 
+/* 문법 : return <status> <target> ; */
+void	ServerConfig::handleReturn(const std::vector<Token>& tokens, size_t& i)
+{
+	if (this->_hasRedirect)
+		throw ConfigSemanticException("Error: duplicate return directive");
+
+	i++; // "return"
+
+	// status code
+	if (i >= tokens.size() || tokens[i].type != TOKEN_WORD || !isNumber(tokens[i].value))
+		throw ConfigSyntaxException("Error: return requires status code");
+
+	int status = std::atoi(tokens[i].value.c_str()); // status 범위 작아서 int도 괜찮음
+	if (status < 300 || status > 399)
+		throw ConfigSemanticException("Error: return status must be 3xx");
+
+	i++;
+
+	// target
+	if (i >= tokens.size() || tokens[i].type != TOKEN_WORD)
+		throw ConfigSyntaxException("Error: return requires target");
+
+	std::string target = tokens[i].value;
+	i++;
+
+	// semicolon
+	if (i >= tokens.size() || tokens[i].type != TOKEN_SEMICOLON)
+		throw ConfigSyntaxException("Error: missing ';' after return");
+
+	i++;
+
+	this->_redirect.status = status;
+	this->_redirect.target = target;
+	this->_hasRedirect = true;
+}
+
 void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -262,6 +262,8 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleClientMaxBodySize(tokens, i);
 	else if (field == "index")
 		handleIndex(tokens, i);
+	else if (field == "return")
+		handleReturn(tokens, i);
 	else if (field == "methods")
 		handleMethods(tokens, i);
 	else
@@ -358,22 +360,14 @@ bool	ServerConfig::hasMethods(void) const { return this->_hasMethods; }
 
 const std::vector<std::string>&	ServerConfig::getMethods(void) const { return this->_methods; }
 
-bool	ServerConfig::hasServerNames(void) const
-{
-	return this->_hasServerNames;
-}
+bool	ServerConfig::hasServerNames(void) const { return this->_hasServerNames; }
 
-const std::vector<std::string>&	ServerConfig::getServerNames(void) const
-{
-	return this->_serverNames;
-}
+const std::vector<std::string>&	ServerConfig::getServerNames(void) const { return this->_serverNames; }
 
-bool	ServerConfig::hasClientMaxBodySize(void) const
-{
-	return this->_hasClientMaxBodySize;
-}
+bool	ServerConfig::hasClientMaxBodySize(void) const { return this->_hasClientMaxBodySize; }
 
-size_t	ServerConfig::getClientMaxBodySize(void) const
-{
-	return this->_clientMaxBodySize;
-}
+size_t	ServerConfig::getClientMaxBodySize(void) const { return this->_clientMaxBodySize; }
+
+bool	ServerConfig::hasRedirect(void) const { return this->_hasRedirect; }
+
+const Redirect&	ServerConfig::getRedirect(void) const { return this->_redirect; }

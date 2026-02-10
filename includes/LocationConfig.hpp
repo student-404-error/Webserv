@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:24 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 03:05:26 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 04:16:11 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,15 +15,15 @@
 
 #include "Token.hpp"
 #include "ConfigException.hpp"
-#include <vector>
-#include <stdexcept>
+#include "ConfigTypes.hpp"
+#include "ConfigUtils.hpp"
 
 class	LocationConfig
 {
 	public:
 		LocationConfig(const std::string &path); // path(block identifier): location "/upload"
 		~LocationConfig(void);
-	
+
 		void							parseDirective(const std::vector<Token> &tokens, size_t &i);
 		void							validateLocationBlock(void); // server block 유효성 검사 함수와 동일
 
@@ -39,7 +39,8 @@ class	LocationConfig
 		
 		bool							hasIndex(void) const;
 		const std::vector<std::string>&	getIndex(void) const;
-
+		bool							hasRedirect(void) const;
+		const Redirect&					getRedirect(void) const;
 	
 	private:
 		/* 지시문 handlers funcs */
@@ -47,7 +48,8 @@ class	LocationConfig
 		void	handleAutoindex(const std::vector<Token> &tokens, size_t &i);
 		void	handleMethods(const std::vector<Token> &tokens, size_t &i);
 		void	handleIndex(const std::vector<Token>& tokens, size_t& i);
-	
+		void	handleReturn(const std::vector<Token>& tokens, size_t& i);
+
 		void	validatePath(void) const;
 	
 		std::string					_path;
@@ -63,6 +65,8 @@ class	LocationConfig
 		/* location 필드 그외 */
 		std::vector<std::string>	_index;
 		bool						_hasIndex;
+		Redirect					_redirect;
+		bool						_hasRedirect;
 };
 
 #endif
