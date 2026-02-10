@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:12 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 04:16:16 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 04:35:24 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,7 @@
 #include "ConfigException.hpp"
 #include "ConfigTypes.hpp"
 #include "ConfigUtils.hpp"
+#include <vector>
 #include <cstdlib> // std::atol
 
 class	ServerConfig
@@ -55,6 +56,9 @@ class	ServerConfig
 		const std::vector<std::string>&	getIndex(void) const;
 		bool							hasRedirect(void) const;
 		const Redirect&					getRedirect(void) const;
+		bool 							hasAllowMethods(void) const;
+		const std::vector<std::string>&	getAllowMethods(void) const;
+
 
 
 		void							parseDirective(const std::vector<Token> &tokens, size_t &i);
@@ -71,6 +75,7 @@ class	ServerConfig
 		void	handleClientMaxBodySize(const std::vector<Token>& tokens, size_t& i);
 		void	handleIndex(const std::vector<Token>& tokens, size_t& i);
 		void	handleReturn(const std::vector<Token>& tokens, size_t& i);
+		void	handleAllowMethods(const std::vector<Token>& tokens, size_t& i);
 		
 		/* server name handlers */
 		void	handleServerName(const std::vector<Token>& tokens, size_t& i);
@@ -100,6 +105,10 @@ class	ServerConfig
 		bool						_hasIndex;
 		Redirect					_redirect;
 		bool						_hasRedirect;
+
+		/* allow_methods (methods와 완전히 분리된 필드) */
+		std::vector<std::string>	_allowMethods;
+		bool						_hasAllowMethods;
 };
 
 #endif

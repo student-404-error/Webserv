@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:37 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 04:00:39 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 04:36:51 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -139,6 +139,43 @@ void	LocationConfig::handleReturn(const std::vector<Token>& tokens, size_t& i)
 	this->_hasRedirect = true;
 }
 
+void LocationConfig::handleAllowMethods(const std::vector<Token>& tokens, size_t& i)
+{
+	this->_allowMethods.clear();
+	this->_hasAllowMethods = true;
+
+	i++; // "allow_methods"
+
+	bool hasValue = false;
+
+	while (i < tokens.size())
+	{
+		if (tokens[i].type == TOKEN_SEMICOLON)
+		{
+			if (!hasValue)
+				throw ConfigSyntaxException("Error: allow_methods requires at least one value");
+			i++;
+			return;
+		}
+
+		if (tokens[i].type != TOKEN_WORD)
+			throw ConfigSyntaxException("Error: allow_methods: invalid token");
+
+		const std::string& met = tokens[i].value;
+		if (met != "GET" && met != "POST" && met != "DELETE")
+			throw ConfigSyntaxException("Error: allow_methods: unknown method " + met);
+
+		for (size_t j = 0; j < this->_allowMethods.size(); j++)
+			if (this->_allowMethods[j] == met)
+				throw ConfigSemanticException("Error: duplicate allow_methods: " + met);
+
+		this->_allowMethods.push_back(met);
+		hasValue = true;
+		i++;
+	}
+	throw ConfigSyntaxException("Error: allow_methods: missing ';'");
+}
+
 void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -153,6 +190,8 @@ void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleReturn(tokens, i);
 	else if (field == "methods")
 		handleMethods(tokens, i);
+	else if (field == "allow_methods")
+		handleAllowMethods(tokens, i);
 	else
 		throw ConfigSemanticException("Error: Unknown location directive: " + field);
 }
@@ -190,3 +229,7 @@ const std::vector<std::string>&	LocationConfig::getMethods(void) const { return 
 bool	LocationConfig::hasRedirect(void) const { return this->_hasRedirect; }
 
 const Redirect&	LocationConfig::getRedirect(void) const { return this->_redirect; }
+
+bool	LocationConfig::hasAllowMethods(void) const { return this->_hasAllowMethods; }
+
+const std::vector<std::string>& LocationConfig::getAllowMethods(void) const { return this->_allowMethods; }

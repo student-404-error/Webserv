@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 04:14:43 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 04:37:46 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -244,6 +244,43 @@ void	ServerConfig::handleReturn(const std::vector<Token>& tokens, size_t& i)
 	this->_hasRedirect = true;
 }
 
+void ServerConfig::handleAllowMethods(const std::vector<Token>& tokens, size_t& i)
+{
+	this->_allowMethods.clear();
+	this->_hasAllowMethods = true;
+
+	i++; // "allow_methods"
+
+	bool hasValue = false;
+
+	while (i < tokens.size())
+	{
+		if (tokens[i].type == TOKEN_SEMICOLON)
+		{
+			if (!hasValue)
+				throw ConfigSyntaxException("Error: allow_methods requires at least one value");
+			i++;
+			return;
+		}
+
+		if (tokens[i].type != TOKEN_WORD)
+			throw ConfigSyntaxException("Error: allow_methods: invalid token");
+
+		const std::string& met = tokens[i].value;
+		if (met != "GET" && met != "POST" && met != "DELETE")
+			throw ConfigSyntaxException("Error: allow_methods: unknown method " + met);
+
+		for (size_t j = 0; j < this->_allowMethods.size(); j++)
+			if (this->_allowMethods[j] == met)
+				throw ConfigSemanticException("Error: duplicate allow_methods: " + met);
+
+		this->_allowMethods.push_back(met);
+		hasValue = true;
+		i++;
+	}
+	throw ConfigSyntaxException("Error: allow_methods: missing ';'");
+}
+
 void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -254,7 +291,7 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleRoot(tokens, i);
 	else if (field == "error_page")
 		handleErrorPage(tokens, i);
-	// TODO: listen host:port 형태 지원 시 IP 파싱 추가
+	// TODO: listen host:port 형태 지원 시 IP 파싱 추가: -> ip 파싱?? 다시 확인해보기
 	// TODO: server_name 파싱 추가 (다중 값 지원): 완료(O)
 	else if (field == "server_name")
 		handleServerName(tokens, i);
@@ -266,6 +303,8 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleReturn(tokens, i);
 	else if (field == "methods")
 		handleMethods(tokens, i);
+	else if (field == "allow_methods")
+		handleAllowMethods(tokens, i);
 	else
 		throw ConfigSyntaxException("Error: unknown server directive: " + field);
 }
@@ -371,3 +410,7 @@ size_t	ServerConfig::getClientMaxBodySize(void) const { return this->_clientMaxB
 bool	ServerConfig::hasRedirect(void) const { return this->_hasRedirect; }
 
 const Redirect&	ServerConfig::getRedirect(void) const { return this->_redirect; }
+
+bool	ServerConfig::hasAllowMethods(void) const { return this->_hasAllowMethods; }
+
+const std::vector<std::string>&	ServerConfig::getAllowMethods(void) const { return this->_allowMethods; }

@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:24 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 04:16:11 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 04:35:38 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,6 +17,7 @@
 #include "ConfigException.hpp"
 #include "ConfigTypes.hpp"
 #include "ConfigUtils.hpp"
+#include <vector>
 
 class	LocationConfig
 {
@@ -41,6 +42,9 @@ class	LocationConfig
 		const std::vector<std::string>&	getIndex(void) const;
 		bool							hasRedirect(void) const;
 		const Redirect&					getRedirect(void) const;
+		bool							hasAllowMethods(void) const;
+		const std::vector<std::string>&	getAllowMethods(void) const;
+
 	
 	private:
 		/* 지시문 handlers funcs */
@@ -49,6 +53,7 @@ class	LocationConfig
 		void	handleMethods(const std::vector<Token> &tokens, size_t &i);
 		void	handleIndex(const std::vector<Token>& tokens, size_t& i);
 		void	handleReturn(const std::vector<Token>& tokens, size_t& i);
+		void	handleAllowMethods(const std::vector<Token>& tokens, size_t& i);
 
 		void	validatePath(void) const;
 	
@@ -67,6 +72,11 @@ class	LocationConfig
 		bool						_hasIndex;
 		Redirect					_redirect;
 		bool						_hasRedirect;
+
+		/* allow_methods */
+		std::vector<std::string>	_allowMethods;
+		bool						_hasAllowMethods;
+
 };
 
 #endif
