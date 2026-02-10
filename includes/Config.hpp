@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/25 16:04:02 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/08 06:17:34 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 16:19:30 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -42,6 +42,9 @@ class	Config
 
 		void	configParse(void);
 		//void	validateDirective(size_t &i); // ServerConfig::handler에서 각자 검사(조건이 다 다름)
+
+		/* 외부에서 _servers 접근 위한 함수 (나중에 Server쪽에서 사용) */
+		const std::vector<ServerConfig>&	getServers(void) const;
 	
 	private:
 		std::string					_content;

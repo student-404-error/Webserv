@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/25 16:03:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/08 06:18:17 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 16:20:21 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -212,3 +212,6 @@ void	Config::configParse()
 		throw ;
 	}
 }
+
+/* 외부에서 _servers 접근 위한 함수 (나중에 Server쪽에서 사용) */
+const std::vector<ServerConfig>&	Config::getServers(void) const { return this->_servers; }
