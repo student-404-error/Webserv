@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:12 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 02:21:12 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 02:56:21 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,7 @@
 #include "ConfigException.hpp"
 #include <vector>
 #include <stdexcept>
+#include <cstdlib> // std::atol
 
 class	ServerConfig
 {
@@ -41,6 +42,9 @@ class	ServerConfig
 		/* getter */
 		bool							hasServerNames(void) const;
 		const std::vector<std::string>&	getServerNames(void) const;
+		bool							hasClientMaxBodySize(void) const;
+		size_t							getClientMaxBodySize(void) const;
+
 
 		void							parseDirective(const std::vector<Token> &tokens, size_t &i);
 		void							addLocation(const LocationConfig &location); // location은 server 내부에 종속: ServerConfig가 관리 및 내부에서 통제 가능(캡슐화)
@@ -58,6 +62,7 @@ class	ServerConfig
 		void	handleRoot(const std::vector<Token> &tokens, size_t &i);
 		void	handleErrorPage(const std::vector<Token> &tokens, size_t &i);
 		void	handleMethods(const std::vector<Token>& tokens, size_t& i);
+		void	handleClientMaxBodySize(const std::vector<Token>& tokens, size_t& i);
 		
 		/* server name handlers */
 		void	handleServerName(const std::vector<Token>& tokens, size_t& i);
@@ -78,9 +83,12 @@ class	ServerConfig
 		std::vector<std::string>	_methods;
 		bool						_hasMethods;
 		
-		/* ServerConfig private */
+		/* server 그외 필드 */
 		std::vector<std::string>	_serverNames;
 		bool						_hasServerNames;
+		size_t						_clientMaxBodySize;
+		bool						_hasClientMaxBodySize;
+
 };
 
 #endif

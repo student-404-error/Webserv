@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 02:33:08 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 02:57:51 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,9 @@
 /* TODO) 임시로 넣은 기본 경로 (semantic validation 목적) / 팀 협의 필요 */
 static const std::string	DEFAULT_SERVER_ROOT = "./www";
 static const std::string	DEFAULT_ERROR_PAGE = "/errors/404.html";
+static const size_t			DEFAULT_CLIENT_MAX_BODY_SIZE = 1000000; // ex) 1MB (임시값)
+static const size_t			MAX_CLIENT_BODY_SIZE = 100000000; // 100MB (임시로 넣은 값)
+
 
 /* 공통 helper func */
 static bool	isNumber(const std::string &s)
@@ -136,7 +139,7 @@ void	ServerConfig::handleMethods(const std::vector<Token>& tokens, size_t& i)
 		if (met != "GET" && met != "POST" && met != "DELETE")
 			throw ConfigSyntaxException("Error: methods: unknown method " + met);
 
-		_methods.push_back(met);
+		this->_methods.push_back(met);
 		i++;
 	}
 
@@ -150,7 +153,7 @@ void	ServerConfig::handleServerName(const std::vector<Token>& tokens, size_t& i)
 
 	i++; // server_name 패스
 
-	bool hasValue = false;
+	bool	hasValue = false;
 
 	while (i < tokens.size())
 	{
@@ -166,7 +169,7 @@ void	ServerConfig::handleServerName(const std::vector<Token>& tokens, size_t& i)
 
 		hasValue = true;
 
-		const std::string& name = tokens[i].value;
+		const std::string&	name = tokens[i].value;
 
 		// server_name 중복 검사
 		for (size_t j = 0; j < this->_serverNames.size(); j++)
@@ -181,6 +184,28 @@ void	ServerConfig::handleServerName(const std::vector<Token>& tokens, size_t& i)
 	throw ConfigSyntaxException("Error: server_name: missing ';'");
 }
 
+void	ServerConfig::handleClientMaxBodySize(const std::vector<Token>& tokens, size_t& i)
+{
+	if (this->_hasClientMaxBodySize)
+		throw ConfigSemanticException("Error: duplicate client_max_body_size");
+
+	const Token&	sizeValue = directiveSyntaxCheck(tokens, i, "client_max_body_size");
+
+	if (!isNumber(sizeValue.value))
+		throw ConfigSyntaxException("Error: client_max_body_size must be a number");
+
+	long size = std::atol(sizeValue.value.c_str()); // 문자열 -> 숫자로 저장 (int는 오버플로우 위험있음(혹은 쓰레기값), long은 음수 입력을 음수 그대로 감지 가능)
+
+	if (size <= 0)
+		throw ConfigSemanticException("Error: client_max_body_size must be > 0");
+	
+	if (static_cast<size_t>(size) > MAX_CLIENT_BODY_SIZE) // TODO) MAX SIZE 다시 확인하기
+		throw ConfigSemanticException("Error: client_max_body_size too large");
+
+	this->_clientMaxBodySize = static_cast<size_t>(size);
+	this->_hasClientMaxBodySize = true;
+}
+
 void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -192,9 +217,11 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 	else if (field == "error_page")
 		handleErrorPage(tokens, i);
 	// TODO: listen host:port 형태 지원 시 IP 파싱 추가
-	// TODO: server_name 파싱 추가 (다중 값 지원)
+	// TODO: server_name 파싱 추가 (다중 값 지원): 완료(O)
 	else if (field == "server_name")
 		handleServerName(tokens, i);
+	else if (field == "client_max_body_size")
+		handleClientMaxBodySize(tokens, i);
 	else if (field == "methods")
 		handleMethods(tokens, i);
 	else
@@ -273,12 +300,15 @@ const std::vector<LocationConfig>& ServerConfig::getLocations() const
 	return this->_locations;
 }
 
-/* validateServerBlock(): 필수인데 빠지면 서버가 동작 불가능한 것들 조건 검사 (server_name은 필수가 아니라서(기본값 없음) 넣지 않음: parseDirective에서 있으면 넣기) */
+/* validateServerBlock(): 필수인데 빠지면 서버가 동작 불가능한 것들 조건 검사
+	(server_name은 필수가 아니라서(server_name은 기본값 없음) 넣지 않음: parseDirective에서 field로 있으면 넣기) */
 void	ServerConfig::validateServerBlock()
 {
 	validateListenDirective(); // 1) listen 필수 검사
 	applyDefaultRoot(); // 2) root 기본값
 	applyDefaultErrorPage(); // 3) error_page 기본값
+	if (!this->_hasClientMaxBodySize) // 필수는 아니지만, 런타임에서 반드시 필요
+		this->_clientMaxBodySize = DEFAULT_CLIENT_MAX_BODY_SIZE;
 	duplicateLocationPathCheck(); // 4) location path 중복 검사
 }
 
@@ -296,4 +326,14 @@ bool	ServerConfig::hasServerNames(void) const
 const std::vector<std::string>&	ServerConfig::getServerNames(void) const
 {
 	return this->_serverNames;
+}
+
+bool	ServerConfig::hasClientMaxBodySize(void) const
+{
+	return this->_hasClientMaxBodySize;
+}
+
+size_t	ServerConfig::getClientMaxBodySize(void) const
+{
+	return this->_clientMaxBodySize;
 }
