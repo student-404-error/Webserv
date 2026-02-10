@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 16:39:36 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 18:50:25 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -46,7 +46,8 @@ static void	parseListenValue(const std::string& value, std::string& ip, int& por
 		throw ConfigSemanticException("Error: listen: port out of range");
 }
 
-ServerConfig::ServerConfig() : _root(""), _errorPage(""), _hasMethods(false) {}
+ServerConfig::ServerConfig() : _root(""), _errorPage(""), _clientMaxBodySize(0), _hasMethods(false), _hasServerNames(false),
+	_hasClientMaxBodySize(false), _hasIndex(false), _hasRedirect(false), _hasAllowMethods(false) {}
 
 ServerConfig::~ServerConfig() {}
 

@@ -6,13 +6,14 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:37 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 16:37:03 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 18:19:08 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "LocationConfig.hpp"
 
-LocationConfig::LocationConfig(const std::string &path) : _path(path), _root(""), _rootSet(false), _autoindex(false), _autoindexSet(false), _hasMethods(false) {}
+LocationConfig::LocationConfig(const std::string &path) : _path(path), _root(""), _uploadStore(""), _rootSet(false), _autoindex(false), _autoindexSet(false),
+	_hasMethods(false), _hasIndex(false), _hasRedirect(false), _hasAllowMethods(false), _hasUploadStore(false), _hasCgiPass(false) {}
 
 LocationConfig::~LocationConfig() {}
 
