@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:24 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/08 07:32:39 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 03:05:26 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -36,12 +36,17 @@ class	LocationConfig
 		bool							getAutoindex(void) const;
 		bool							hasMethods(void) const;
 		const std::vector<std::string>&	getMethods(void) const;
+		
+		bool							hasIndex(void) const;
+		const std::vector<std::string>&	getIndex(void) const;
+
 	
 	private:
 		/* 지시문 handlers funcs */
 		void	handleRoot(const std::vector<Token> &tokens, size_t &i);
 		void	handleAutoindex(const std::vector<Token> &tokens, size_t &i);
 		void	handleMethods(const std::vector<Token> &tokens, size_t &i);
+		void	handleIndex(const std::vector<Token>& tokens, size_t& i);
 	
 		void	validatePath(void) const;
 	
@@ -54,6 +59,10 @@ class	LocationConfig
 		/* methods */
 		std::vector<std::string>	_methods;
 		bool						_hasMethods;
+		
+		/* location 필드 그외 */
+		std::vector<std::string>	_index;
+		bool						_hasIndex;
 };
 
 #endif

@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 02:57:51 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 03:04:02 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -206,6 +206,44 @@ void	ServerConfig::handleClientMaxBodySize(const std::vector<Token>& tokens, siz
 	this->_hasClientMaxBodySize = true;
 }
 
+void	ServerConfig::handleIndex(const std::vector<Token>& tokens, size_t& i)
+{
+	this->_index.clear();
+	this->_hasIndex = true;
+
+	i++; // "index" 패스
+
+	bool hasValue = false;
+
+	while (i < tokens.size())
+	{
+		if (tokens[i].type == TOKEN_SEMICOLON)
+		{
+			if (!hasValue)
+				throw ConfigSyntaxException("Error: index requires at least one value");
+			i++;
+			return;
+		}
+
+		if (tokens[i].type != TOKEN_WORD)
+			throw ConfigSyntaxException("Error: index: invalid token");
+
+		const std::string& name = tokens[i].value;
+
+		// 중복 검사
+		for (size_t j = 0; j < this->_index.size(); j++)
+		{
+			if (this->_index[j] == name)
+				throw ConfigSemanticException("Error: duplicate index: " + name);
+		}
+
+		this->_index.push_back(name);
+		hasValue = true;
+		i++;
+	}
+	throw ConfigSyntaxException("Error: index: missing ';'");
+}
+
 void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -222,6 +260,8 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleServerName(tokens, i);
 	else if (field == "client_max_body_size")
 		handleClientMaxBodySize(tokens, i);
+	else if (field == "index")
+		handleIndex(tokens, i);
 	else if (field == "methods")
 		handleMethods(tokens, i);
 	else

@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:37 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/08 07:31:23 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 03:04:18 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -89,6 +89,43 @@ void	LocationConfig::handleMethods(const std::vector<Token>& tokens, size_t& i)
 	throw ConfigSyntaxException("Error: methods: missing ';'");
 }
 
+void	LocationConfig::handleIndex(const std::vector<Token>& tokens, size_t& i)
+{
+	this->_index.clear();
+	this->_hasIndex = true;
+
+	i++;
+
+	bool hasValue = false;
+
+	while (i < tokens.size())
+	{
+		if (tokens[i].type == TOKEN_SEMICOLON)
+		{
+			if (!hasValue)
+				throw ConfigSyntaxException("Error: index requires at least one value");
+			i++;
+			return;
+		}
+
+		if (tokens[i].type != TOKEN_WORD)
+			throw ConfigSyntaxException("Error: index: invalid token");
+
+		const std::string& name = tokens[i].value;
+
+		for (size_t j = 0; j < this->_index.size(); j++)
+		{
+			if (this->_index[j] == name)
+				throw ConfigSemanticException("Error: duplicate index: " + name);
+		}
+
+		this->_index.push_back(name);
+		hasValue = true;
+		i++;
+	}
+	throw ConfigSyntaxException("Error: index: missing ';'");
+}
+
 void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -97,6 +134,8 @@ void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleRoot(tokens, i);
 	else if (field == "autoindex")
 		handleAutoindex(tokens, i);
+	else if (field == "index")
+		handleIndex(tokens, i);
 	else if (field == "methods")
 		handleMethods(tokens, i);
 	else
