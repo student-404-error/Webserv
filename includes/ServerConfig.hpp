@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:12 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/08 07:39:18 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 02:21:12 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,17 +25,23 @@ class	ServerConfig
 		ServerConfig(void);
 		~ServerConfig(void);
 
-    		/* getter */
+    	/* getter */
 		std::vector<int> getListenPorts(void) const;
 		const std::vector<LocationConfig>& getLocations(void) const;
 		const std::string&				getRoot(void) const;
 		const std::string&				getErrorPage(void) const;
 		bool							hasMethods(void) const;
 		const std::vector<std::string>&	getMethods(void) const;
+		
 		/* TODO: 가상호스트용 필드/게터 추가 예정
 			- std::vector<std::string> _serverNames;
 			- std::string _host; // listen IP 지정 시
 		*/
+	
+		/* getter */
+		bool							hasServerNames(void) const;
+		const std::vector<std::string>&	getServerNames(void) const;
+
 		void							parseDirective(const std::vector<Token> &tokens, size_t &i);
 		void							addLocation(const LocationConfig &location); // location은 server 내부에 종속: ServerConfig가 관리 및 내부에서 통제 가능(캡슐화)
 		void							validateServerBlock(void); // server block 전체 보고 판단: 의미적으로 완성되었는가, 기본값을 채워야 하는가
@@ -52,6 +58,9 @@ class	ServerConfig
 		void	handleRoot(const std::vector<Token> &tokens, size_t &i);
 		void	handleErrorPage(const std::vector<Token> &tokens, size_t &i);
 		void	handleMethods(const std::vector<Token>& tokens, size_t& i);
+		
+		/* server name handlers */
+		void	handleServerName(const std::vector<Token>& tokens, size_t& i);
 
 		void	duplicateLocationPathCheck(void) const;
 		void	applyDefaultErrorPage(void);
@@ -68,6 +77,10 @@ class	ServerConfig
 		/* methods */
 		std::vector<std::string>	_methods;
 		bool						_hasMethods;
+		
+		/* ServerConfig private */
+		std::vector<std::string>	_serverNames;
+		bool						_hasServerNames;
 };
 
 #endif

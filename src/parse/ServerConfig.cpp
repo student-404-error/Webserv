@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/08 15:08:23 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 02:33:08 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -143,6 +143,44 @@ void	ServerConfig::handleMethods(const std::vector<Token>& tokens, size_t& i)
 	throw ConfigSyntaxException("Error: methods: missing ';'");
 }
 
+void	ServerConfig::handleServerName(const std::vector<Token>& tokens, size_t& i)
+{
+	this->_serverNames.clear();
+	this->_hasServerNames = true;
+
+	i++; // server_name 패스
+
+	bool hasValue = false;
+
+	while (i < tokens.size())
+	{
+		if (tokens[i].type == TOKEN_SEMICOLON)
+		{
+			if (!hasValue)
+				throw ConfigSyntaxException("Error: server_name requires at least one value");
+			i++;
+			return;
+		}
+		if (tokens[i].type != TOKEN_WORD)
+			throw ConfigSyntaxException("Error: server_name: invalid token");
+
+		hasValue = true;
+
+		const std::string& name = tokens[i].value;
+
+		// server_name 중복 검사
+		for (size_t j = 0; j < this->_serverNames.size(); j++)
+		{
+			if (this->_serverNames[j] == name)
+				throw ConfigSemanticException("Error: duplicate server_name: " + name);
+		}
+
+		this->_serverNames.push_back(name);
+		i++;
+	}
+	throw ConfigSyntaxException("Error: server_name: missing ';'");
+}
+
 void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -153,8 +191,10 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleRoot(tokens, i);
 	else if (field == "error_page")
 		handleErrorPage(tokens, i);
-	// TODO: server_name 파싱 추가 (다중 값 지원)
 	// TODO: listen host:port 형태 지원 시 IP 파싱 추가
+	// TODO: server_name 파싱 추가 (다중 값 지원)
+	else if (field == "server_name")
+		handleServerName(tokens, i);
 	else if (field == "methods")
 		handleMethods(tokens, i);
 	else
@@ -233,6 +273,7 @@ const std::vector<LocationConfig>& ServerConfig::getLocations() const
 	return this->_locations;
 }
 
+/* validateServerBlock(): 필수인데 빠지면 서버가 동작 불가능한 것들 조건 검사 (server_name은 필수가 아니라서(기본값 없음) 넣지 않음: parseDirective에서 있으면 넣기) */
 void	ServerConfig::validateServerBlock()
 {
 	validateListenDirective(); // 1) listen 필수 검사
@@ -246,3 +287,13 @@ void	ServerConfig::validateServerBlock()
 bool	ServerConfig::hasMethods(void) const { return this->_hasMethods; }
 
 const std::vector<std::string>&	ServerConfig::getMethods(void) const { return this->_methods; }
+
+bool	ServerConfig::hasServerNames(void) const
+{
+	return this->_hasServerNames;
+}
+
+const std::vector<std::string>&	ServerConfig::getServerNames(void) const
+{
+	return this->_serverNames;
+}
