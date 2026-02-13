@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/26 22:11:46 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/01/26 22:55:06 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 18:51:30 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,6 +30,9 @@ struct Token
 {
 	std::string	value; // 실제 텍스트
 	TokenType	type;
+
+	// 생성자 초기화
+	Token() : value(""), type(TOKEN_EOF) {}
 };
 
 #endif
