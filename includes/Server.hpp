@@ -6,31 +6,36 @@
 #include <string>
 #include <ctime>
 #include <poll.h>
+#include <set>
 
 #include "Connection.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
-
-struct Config {
-    int port;
-    int maxConnections;
-    int idleTimeoutSec;
-
-    Config() : port(8080), maxConnections(1024), idleTimeoutSec(15) {}
-};
+#include "ServerConfig.hpp"
 
 class Server {
 public:
-    explicit Server(const Config& cfg);
+    // explicit: 암묵적 변환을 막아 잘못된 생성 호출을 방지
+    explicit Server(const std::vector<ServerConfig>& cfgs);
     ~Server();
 
     void run();
 
 private:
-    Config _cfg;
-    int _listenFd;
+    std::vector<ServerConfig> _configs;      // 모든 server 블록 설정을 저장
+    std::vector<int> _listenFds;             // 리스닝 소켓 FD 목록
+    std::set<int> _listenFdSet;              // 빠른 판단용 집합
+    int _port;                               // 첫 포트 (임시 호환성)
+    int _maxConnections;
+    int _idleTimeoutSec;
+    int _writeTimeoutSec;
+    int _maxKeepAlive;
+    /* TODO: 가상호스트 매핑 추가
+        - 포트별 ServerConfig 리스트 (선언 순서 유지)
+        - (host, port) -> ServerConfig* 빠른 조회 테이블
+    */
 
-    std::vector<pollfd> _pfds;               // [0] is listen fd
+    std::vector<pollfd> _pfds;               // [0..n) 리스너, 이후 클라이언트
     std::map<int, Connection*> _conns;       // fd -> Connection*
 
     // simple in-memory session store
@@ -46,7 +51,7 @@ private:
     int createListenSocket(int port);
     void setNonBlocking(int fd);
 
-    void acceptLoop();
+    void acceptLoop(int listenFd);
     void handleClientEvent(size_t idx);
 
     void updatePollEventsFor(int fd);
@@ -60,6 +65,8 @@ private:
     // session helpers
     std::string newSessionId();
     Session& getOrCreateSession(const HttpRequest& req, HttpResponse& resp);
+
+    bool isListenFd(int fd) const;
 };
 
 #endif
