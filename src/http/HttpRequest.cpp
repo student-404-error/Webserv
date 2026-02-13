@@ -6,7 +6,7 @@
 /*   By: jaoh <jaoh@student.42.fr>                  +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/20 16:24:43 by jaoh              #+#    #+#             */
-/*   Updated: 2026/02/08 14:53:31 by jaoh             ###   ########.fr       */
+/*   Updated: 2026/02/13 12:28:33 by jaoh             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,24 +15,7 @@
 #include <cstdlib>
 #include <cctype>
 
-// 상수 정의
-namespace {
-    const std::string HEADER_END_MARKER = "\r\n\r\n";  // 헤더와 본문 구분자
-    const std::string CRLF = "\r\n";                    // 줄바꿈
-    const std::string HEADER_SEPARATOR = ":";           // 헤더 키-값 구분자
-    const std::string CHUNKED_ENCODING = "chunked";     // Chunked 전송 인코딩
-    const std::string CONTENT_LENGTH_HEADER = "content-length";
-    const std::string TRANSFER_ENCODING_HEADER = "transfer-encoding";
-    const size_t HEADER_END_SIZE = 4;                   // "\r\n\r\n" 크기
-    
-    // 헬퍼 함수: 줄 끝의 \r 제거
-    void removeTrailingCR(std::string& line) {
-        if (!line.empty() && line[line.size() - 1] == '\r') {
-            line.erase(line.size() - 1);
-        }
-    }
-}
-
+// 기본 생성자: 각 플래그와 상태값을 초기화한다.
 HttpRequest::HttpRequest()
     : headersParsed(false),
       bodyParsed(false),
@@ -42,29 +25,28 @@ HttpRequest::HttpRequest()
       chunked(false),
       bodyStart(0) {}
 
+// 소켓에서 새로 읽은 데이터를 rawBuffer에 이어 붙이고,
+// 헤더/바디를 순차적으로 파싱한다.
+// complete가 true가 되면 하나의 HTTP 요청이 완성된 것.
 bool HttpRequest::appendData(const std::string& data) {
     rawBuffer += data;
 
-    // 1단계: 헤더 파싱 (아직 완료되지 않은 경우)
+    // 아직 헤더를 다 읽지 못했다면, 헤더 끝("\r\n\r\n")을 찾는다.
     if (!headersParsed) {
-        size_t headerEndPos = rawBuffer.find(HEADER_END_MARKER);
-        if (headerEndPos == std::string::npos) {
-            // 헤더 끝을 찾지 못함 - 더 많은 데이터 필요
+        size_t pos = rawBuffer.find("\r\n\r\n");
+        if (pos == std::string::npos)
             return false;
-        }
 
-        // 헤더 블록 파싱
-        parseHeaders(rawBuffer.substr(0, headerEndPos));
-        bodyStart = headerEndPos + HEADER_END_SIZE;
+        // 헤더 블록(첫 줄 + 헤더들)을 잘라서 파싱
+        parseHeaders(rawBuffer.substr(0, pos));
+        bodyStart = pos + 4;
         headersParsed = true;
     }
 
-    // 2단계: 본문 파싱 (헤더 파싱 완료 후)
+    // 헤더 파싱이 끝난 이후에는 바디를 파싱
     if (!bodyParsed) {
-        if (!parseBody()) {
-            // 본문이 아직 완전히 수신되지 않음
+        if (!parseBody())
             return false;
-        }
     }
 
     return complete;
@@ -72,76 +54,68 @@ bool HttpRequest::appendData(const std::string& data) {
 
 /* ================= Request Line + Headers ================= */
 
+// "GET /index.html HTTP/1.1" 형식의 첫 줄을 method, uri, version 으로 분리
 void HttpRequest::parseRequestLine(const std::string& line) {
     std::stringstream ss(line);
     ss >> method >> uri >> version;
 
-    // 요청 라인 형식 검증: 세 요소가 모두 있어야 함
-    if (method.empty() || uri.empty() || version.empty()) {
+    if (method.empty() || uri.empty() || version.empty())
         error = true;
-    }
 }
 
+// 첫 줄(요청 라인) 이후의 헤더들을 한 줄씩 읽어 파싱
 void HttpRequest::parseHeaders(const std::string& block) {
     std::istringstream iss(block);
     std::string line;
 
-    // 첫 번째 줄: 요청 라인 파싱
+    // 첫 줄은 요청 라인
     std::getline(iss, line);
-    removeTrailingCR(line);
+    if (line.size() && line[line.size() - 1] == '\r')
+        line.erase(line.size() - 1);
     parseRequestLine(line);
 
-    // 나머지 줄들: 헤더 파싱
+    // 나머지 줄들은 "Key: Value" 형식의 헤더
     while (std::getline(iss, line)) {
-        removeTrailingCR(line);
-        
-        // 빈 줄이면 헤더 블록 종료
-        if (line.empty()) {
+        if (line.size() && line[line.size() - 1] == '\r')
+            line.erase(line.size() - 1);
+        if (line.empty())
             break;
-        }
 
-        // 헤더 형식: "Key: Value"
-        size_t colonPos = line.find(HEADER_SEPARATOR);
-        if (colonPos == std::string::npos) {
+        size_t pos = line.find(":");
+        if (pos == std::string::npos) {
             error = true;
             return;
         }
 
-        std::string key = toLower(trim(line.substr(0, colonPos)));
-        std::string value = trim(line.substr(colonPos + 1));
+        std::string key = toLower(trim(line.substr(0, pos)));
+        std::string value = trim(line.substr(pos + 1));
 
         headers[key] = value;
     }
 
-    // Content-Length 헤더 처리
-    if (headers.count(CONTENT_LENGTH_HEADER)) {
-        int len = std::atoi(headers[CONTENT_LENGTH_HEADER].c_str());
+    // Content-Length 가 있으면 바디 길이 설정
+    if (headers.count("content-length")) {
+        int len = std::atoi(headers["content-length"].c_str());
         contentLength = (len > 0) ? static_cast<size_t>(len) : 0;
     }
 
-    // Transfer-Encoding: chunked 확인
-    if (headers.count(TRANSFER_ENCODING_HEADER)
-        && toLower(headers[TRANSFER_ENCODING_HEADER]) == CHUNKED_ENCODING) {
+    // Transfer-Encoding: chunked 인 경우 chunked 플래그 설정
+    if (headers.count("transfer-encoding")
+        && toLower(headers["transfer-encoding"]) == "chunked")
         chunked = true;
-    }
 }
 
 /* ================= Body ================= */
 
+// Content-Length 또는 chunked 여부에 따라 body를 파싱
 bool HttpRequest::parseBody() {
-    // Chunked 전송 인코딩인 경우
-    if (chunked) {
+    if (chunked)
         return parseChunkedBody();
-    }
 
-    // Content-Length 기반 본문 파싱
     if (contentLength > 0) {
-        // 필요한 만큼의 데이터가 아직 수신되지 않음
-        if (rawBuffer.size() < bodyStart + contentLength) {
+        if (rawBuffer.size() < bodyStart + contentLength)
             return false;
-        }
 
-        // 본문 추출
         body = rawBuffer.substr(bodyStart, contentLength);
     }
 
@@ -153,98 +127,58 @@ bool HttpRequest::parseBody() {
 /* ================= Chunked ================= */
 
 bool HttpRequest::parseChunkedBody() {
-    size_t currentPos = bodyStart;
+    size_t pos = bodyStart;
 
     while (true) {
-        // 청크 크기 라인 찾기 (16진수)
-        size_t crlfPos = rawBuffer.find(CRLF, currentPos);
-        if (crlfPos == std::string::npos) {
-            // 청크 크기 라인을 찾지 못함 - 더 많은 데이터 필요
+        size_t crlf = rawBuffer.find("\r\n", pos);
+        if (crlf == std::string::npos)
             return false;
-        }
 
-        // 청크 크기 파싱 (16진수 문자열)
-        std::string hexSizeStr = rawBuffer.substr(currentPos, crlfPos - currentPos);
-        size_t chunkSize = std::strtoul(hexSizeStr.c_str(), NULL, 16);
+        std::string hexSize = rawBuffer.substr(pos, crlf - pos);
+        size_t chunkSize = std::strtoul(hexSize.c_str(), NULL, 16);
 
-        // 데이터 시작 위치로 이동 (크기 라인 + CRLF 건너뛰기)
-        currentPos = crlfPos + CRLF.size();
+        pos = crlf + 2;
 
-        // 크기가 0이면 마지막 청크 (본문 종료)
         if (chunkSize == 0) {
             bodyParsed = true;
             complete = true;
             return true;
         }
 
-        // 청크 데이터가 완전히 수신되었는지 확인
-        if (rawBuffer.size() < currentPos + chunkSize + CRLF.size()) {
+        if (rawBuffer.size() < pos + chunkSize + 2)
             return false;
-        }
 
-        // 청크 데이터를 본문에 추가
-        body.append(rawBuffer.substr(currentPos, chunkSize));
-        
-        // 다음 청크로 이동 (데이터 + CRLF 건너뛰기)
-        currentPos += chunkSize + CRLF.size();
+        body.append(rawBuffer.substr(pos, chunkSize));
+        pos += chunkSize + 2; // skip data + CRLF
     }
 }
 
 /* ================= Utils ================= */
 
 std::string HttpRequest::trim(const std::string& s) const {
-    // 앞쪽 공백 제거
     size_t start = 0;
-    while (start < s.size() && std::isspace(s[start])) {
+    while (start < s.size() && std::isspace(s[start]))
         start++;
-    }
-    
-    // 뒤쪽 공백 제거
     size_t end = s.size();
-    while (end > start && std::isspace(s[end - 1])) {
+    while (end > start && std::isspace(s[end - 1]))
         end--;
-    }
-    
     return s.substr(start, end - start);
 }
 
 std::string HttpRequest::toLower(const std::string& s) const {
-    std::string result;
-    result.reserve(s.size());  // 메모리 할당 최적화
-    
-    for (size_t i = 0; i < s.size(); i++) {
-        result += std::tolower(s[i]);
-    }
-    
-    return result;
+    std::string r;
+    for (size_t i = 0; i < s.size(); i++)
+        r += std::tolower(s[i]);
+    return r;
 }
 
 /* ================= Getters ================= */
 
-bool HttpRequest::isComplete() const {
-    return complete;
-}
+bool HttpRequest::isComplete() const { return complete; }
+bool HttpRequest::hasError() const { return error; }
 
-bool HttpRequest::hasError() const {
-    return error;
-}
-
-const std::string& HttpRequest::getMethod() const {
-    return method;
-}
-
-const std::string& HttpRequest::getURI() const {
-    return uri;
-}
-
-const std::string& HttpRequest::getVersion() const {
-    return version;
-}
-
-const std::map<std::string, std::string>& HttpRequest::getHeaders() const {
-    return headers;
-}
-
-const std::string& HttpRequest::getBody() const {
-    return body;
-}
+const std::string& HttpRequest::getMethod() const { return method; }
+const std::string& HttpRequest::getURI() const { return uri; }
+const std::string& HttpRequest::getVersion() const { return version; }
+const std::map<std::string, std::string>& HttpRequest::getHeaders() const { return headers; }
+const std::string& HttpRequest::getBody() const { return body; }
