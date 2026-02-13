@@ -6,20 +6,24 @@
 /*   By: jaoh <jaoh@student.42.fr>                  +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 17:53:03 by jaoh              #+#    #+#             */
-/*   Updated: 2026/02/08 15:40:47 by jaoh             ###   ########.fr       */
+/*   Updated: 2026/02/13 15:58:04 by jaoh             ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "PostHandler.hpp"
 #include <sstream>
+#include <fstream>
 #include <cstdlib>
 #include <cctype>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <ctime>
 
 POSTHandler::POSTHandler(size_t maxBodySizeBytes) : maxBodySize(maxBodySizeBytes) {}
 
 HttpResponse POSTHandler::handle(const HttpRequest& request,
                                  const LocationConfig& location) {
-    (void)location;
     HttpResponse res;
 
     // body size limit 체크 (413)
@@ -42,9 +46,8 @@ HttpResponse POSTHandler::handle(const HttpRequest& request,
             res.setBody("<h1>400 Bad Request</h1>");
             return res;
         }
-        std::string boundary = ct.substr(bpos + 9); // 원문에서 boundary= 뒤
+        std::string boundary = ct.substr(bpos + 9);
         boundary = trim(boundary);
-        // boundary 값이 "..." 형태로 올 수도 있음
         if (boundary.size() >= 2 && boundary[0] == '"' && boundary[boundary.size()-1] == '"')
             boundary = boundary.substr(1, boundary.size()-2);
 
@@ -56,8 +59,7 @@ HttpResponse POSTHandler::handle(const HttpRequest& request,
         return handleFormUrlEncoded(request, location);
     }
 
-    // 그 외: raw body (예: application/json 등) - 프로젝트 요구에 따라 처리
-    // 여기선 일단 200 OK로 echo 예시
+    // 그 외: raw body
     res.setStatus(200);
     res.setContentType("text/plain");
     res.setBody(request.getBody());
@@ -65,7 +67,7 @@ HttpResponse POSTHandler::handle(const HttpRequest& request,
 }
 
 bool POSTHandler::checkBodySize(const HttpRequest& request, HttpResponse& res) const {
-    if (maxBodySize == 0) return true; // 0이면 제한 없음으로 팀 규칙 가능
+    if (maxBodySize == 0) return true;
     if (request.getBody().size() > maxBodySize) {
         res.setStatus(413);
         res.setBody("<h1>413 Payload Too Large</h1>");
@@ -83,7 +85,6 @@ HttpResponse POSTHandler::handleFormUrlEncoded(const HttpRequest& request,
 
     std::map<std::string,std::string> kv = parseUrlEncoded(request.getBody());
 
-    // 예시: 파싱 결과를 text로 반환
     std::ostringstream oss;
     oss << "Parsed x-www-form-urlencoded:\n";
     for (std::map<std::string,std::string>::iterator it = kv.begin(); it != kv.end(); ++it)
@@ -132,44 +133,185 @@ std::string POSTHandler::urlDecode(const std::string& s) const {
 HttpResponse POSTHandler::handleMultipart(const HttpRequest& request,
                                           const LocationConfig& location,
                                           const std::string& boundary) {
-    (void)location;
     HttpResponse res;
+
+    // 업로드가 비활성화되어 있으면 403
+    if (!location.uploadEnabled) {
+        res.setStatus(403);
+        res.setBody("<h1>403 Forbidden</h1><p>File upload not allowed</p>");
+        return res;
+    }
 
     std::vector< std::map<std::string,std::string> > parts;
     if (!parseMultipart(request.getBody(), boundary, parts)) {
         res.setStatus(400);
-        res.setBody("<h1>400 Bad Request</h1>");
+        res.setBody("<h1>400 Bad Request</h1><p>Malformed multipart</p>");
         return res;
     }
 
-    // TODO (Person C 연동):
-    // - parts를 순회하며 file part면 location.uploadDir에 저장
-    // - field part면 폼 데이터로 처리
-    // - 저장 성공 시 201 Created 또는 200 OK
+    // 업로드 디렉토리 확인 및 생성
+    std::string uploadDir = location.uploadDir;
+    if (uploadDir.empty()) {
+        res.setStatus(500);
+        res.setBody("<h1>500 Internal Server Error</h1><p>Upload directory not configured</p>");
+        return res;
+    }
 
-    std::ostringstream oss;
-    oss << "Parsed multipart parts: " << parts.size() << "\n";
-    for (size_t i = 0; i < parts.size(); ++i) {
-        oss << "---- part " << i << "\n";
-        for (std::map<std::string,std::string>::iterator it = parts[i].begin(); it != parts[i].end(); ++it) {
-            oss << it->first << ": " << it->second << "\n";
+    // 디렉토리 존재 확인
+    struct stat st;
+    if (stat(uploadDir.c_str(), &st) != 0 || !S_ISDIR(st.st_mode)) {
+        // 디렉토리 생성 시도
+        if (mkdir(uploadDir.c_str(), 0755) != 0) {
+            res.setStatus(500);
+            res.setBody("<h1>500 Internal Server Error</h1><p>Cannot create upload directory</p>");
+            return res;
         }
     }
 
-    res.setStatus(200);
-    res.setContentType("text/plain");
-    res.setBody(oss.str());
+    std::ostringstream result;
+    int filesUploaded = 0;
+
+    // parts 순회하며 파일 저장
+    for (size_t i = 0; i < parts.size(); ++i) {
+        std::map<std::string,std::string>& part = parts[i];
+        
+        // filename이 있으면 파일 part
+        if (part.count("filename") && !part["filename"].empty()) {
+            std::string originalName = part["filename"];
+            std::string safeName = sanitizeFilename(originalName);
+            
+            if (safeName.empty()) {
+                result << "Skipped invalid filename: " << originalName << "\n";
+                continue;
+            }
+
+            // 중복 방지를 위해 타임스탬프 추가
+            std::string finalName = generateUniqueFilename(uploadDir, safeName);
+            std::string fullPath = uploadDir;
+            if (fullPath[fullPath.size() - 1] != '/')
+                fullPath += "/";
+            fullPath += finalName;
+
+            // Path traversal 최종 검증
+            if (!isPathSafe(fullPath, uploadDir)) {
+                result << "Rejected unsafe path: " << originalName << "\n";
+                continue;
+            }
+
+            // 파일 저장
+            if (saveFile(fullPath, part["data"])) {
+                result << "Uploaded: " << finalName << " (" << part["data"].size() << " bytes)\n";
+                filesUploaded++;
+            } else {
+                result << "Failed to save: " << originalName << "\n";
+            }
+        } else {
+            // 일반 필드
+            if (part.count("name")) {
+                result << "Field '" << part["name"] << "': ";
+                result << part["data"].substr(0, 100);
+                if (part["data"].size() > 100) result << "...";
+                result << "\n";
+            }
+        }
+    }
+
+    if (filesUploaded > 0) {
+        res.setStatus(201); // Created
+        res.setContentType("text/plain");
+        res.setBody(result.str());
+    } else {
+        res.setStatus(200);
+        res.setContentType("text/plain");
+        res.setBody(result.str());
+    }
+
     return res;
 }
 
-/*
-** parts[i] map keys 예시:
-** - disposition
-** - name
-** - filename (있을 때)
-** - content-type (있을 때)
-** - data (원본 바이트; 파일이면 그대로)
-*/
+/* ---------------- 파일 저장 & 보안 ---------------- */
+
+bool POSTHandler::saveFile(const std::string& path, const std::string& data) const {
+    std::ofstream ofs(path.c_str(), std::ios::binary);
+    if (!ofs.is_open())
+        return false;
+    
+    ofs.write(data.c_str(), data.size());
+    ofs.close();
+    
+    return ofs.good();
+}
+
+std::string POSTHandler::sanitizeFilename(const std::string& name) const {
+    std::string safe;
+    
+    for (size_t i = 0; i < name.size(); ++i) {
+        char c = name[i];
+        
+        // 허용: 알파벳, 숫자, 점, 언더스코어, 하이픈
+        if (std::isalnum(static_cast<unsigned char>(c)) || 
+            c == '.' || c == '_' || c == '-') {
+            safe += c;
+        } else {
+            safe += '_'; // 특수문자는 언더스코어로 치환
+        }
+    }
+    
+    // ".." 제거 (path traversal 방지)
+    size_t pos;
+    while ((pos = safe.find("..")) != std::string::npos) {
+        safe.erase(pos, 2);
+    }
+    
+    // 앞뒤 공백/점 제거
+    while (!safe.empty() && (safe[0] == '.' || safe[0] == ' '))
+        safe.erase(0, 1);
+    while (!safe.empty() && (safe[safe.size()-1] == '.' || safe[safe.size()-1] == ' '))
+        safe.erase(safe.size()-1);
+    
+    // 최대 길이 제한 (255자)
+    if (safe.size() > 255)
+        safe = safe.substr(0, 255);
+    
+    return safe;
+}
+
+std::string POSTHandler::generateUniqueFilename(const std::string& dir,
+                                               const std::string& name) const {
+    std::string testPath = dir;
+    if (testPath[testPath.size() - 1] != '/')
+        testPath += "/";
+    testPath += name;
+    
+    // 파일이 없으면 그대로 사용
+    struct stat st;
+    if (stat(testPath.c_str(), &st) != 0)
+        return name;
+    
+    // 중복이면 타임스탬프 추가
+    std::ostringstream oss;
+    oss << std::time(NULL) << "_" << name;
+    return oss.str();
+}
+
+bool POSTHandler::isPathSafe(const std::string& fullPath,
+                             const std::string& baseDir) const {
+    // Canonical path 비교를 통한 검증
+    // 실제로는 realpath() 사용이 더 안전하지만 C++98 제약으로 간단히 구현
+    
+    // fullPath가 baseDir로 시작하는지 확인
+    if (fullPath.compare(0, baseDir.size(), baseDir) != 0)
+        return false;
+    
+    // ".." 가 있으면 거부
+    if (fullPath.find("..") != std::string::npos)
+        return false;
+    
+    return true;
+}
+
+/* ---------------- multipart 파싱 ---------------- */
+
 bool POSTHandler::parseMultipart(const std::string& body,
                                  const std::string& boundary,
                                  std::vector< std::map<std::string,std::string> >& parts) const {
@@ -178,13 +320,11 @@ bool POSTHandler::parseMultipart(const std::string& body,
 
     size_t pos = 0;
 
-    // 첫 boundary 찾기
     size_t first = body.find(delim, pos);
     if (first == std::string::npos) return false;
     pos = first;
 
     while (true) {
-        // boundary line
         if (body.compare(pos, close.size(), close) == 0)
             return true;
 
@@ -193,30 +333,25 @@ bool POSTHandler::parseMultipart(const std::string& body,
 
         pos += delim.size();
 
-        // boundary line 뒤는 \r\n 이어야 정상
         if (pos + 2 > body.size() || body.substr(pos, 2) != "\r\n")
             return false;
         pos += 2;
 
-        // headers 끝 \r\n\r\n
         size_t hdrEnd = body.find("\r\n\r\n", pos);
         if (hdrEnd == std::string::npos) return false;
 
         std::string hdrBlock = body.substr(pos, hdrEnd - pos);
         pos = hdrEnd + 4;
 
-        // 다음 boundary 위치 (data 끝)
         size_t next = body.find("\r\n" + delim, pos);
         if (next == std::string::npos) {
-            // 마지막 close로 끝날 수도 있으므로 close도 확인
             next = body.find("\r\n" + close, pos);
             if (next == std::string::npos) return false;
         }
 
         std::string data = body.substr(pos, next - pos);
-        pos = next + 2; // skip leading \r\n before boundary
+        pos = next + 2;
 
-        // header 파싱 (간단 버전)
         std::map<std::string,std::string> part;
         part["data"] = data;
 
@@ -232,7 +367,6 @@ bool POSTHandler::parseMultipart(const std::string& body,
             std::string v = trim(line.substr(c+1));
             part[k] = v;
 
-            // Content-Disposition에서 name/filename 뽑기 (간단)
             if (k == "content-disposition") {
                 part["disposition"] = v;
                 size_t npos = v.find("name=");
@@ -254,13 +388,12 @@ bool POSTHandler::parseMultipart(const std::string& body,
 
         parts.push_back(part);
 
-        // 다음 루프는 pos가 boundary 시작을 가리킴 (delim 또는 close)
         if (body.compare(pos, close.size(), close) == 0)
             return true;
     }
 }
 
-/* ---------------- small utils ---------------- */
+/* ---------------- utils ---------------- */
 
 std::string POSTHandler::trim(const std::string& s) const {
     size_t a = 0;
