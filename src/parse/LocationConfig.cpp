@@ -6,34 +6,14 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:37 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/08 07:31:23 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 18:19:08 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "LocationConfig.hpp"
 
-/* 공통 helper 함수 (리팩토링) */
-static const Token&	directiveSyntaxCheck(const std::vector<Token>& tokens, size_t& i, const std::string& directiveName)
-{
-	if ((i + 1) >= tokens.size())
-		throw ConfigSyntaxException("Error: " + directiveName + " requires an argument");
-	
-	const Token	&tokenValue = tokens[i + 1]; // token values
-	
-	if (tokenValue.type != TOKEN_WORD)
-		throw ConfigSyntaxException("Error: Invalid argument for " + directiveName);
-	
-	i += 2;
-
-	if (tokens[i].type != TOKEN_SEMICOLON)
-		throw ConfigSyntaxException("Error: missing ';' after " + directiveName);
-	
-	i++;
-
-	return tokenValue;
-}
-
-LocationConfig::LocationConfig(const std::string &path) : _path(path), _root(""), _rootSet(false), _autoindex(false), _autoindexSet(false), _hasMethods(false) {}
+LocationConfig::LocationConfig(const std::string &path) : _path(path), _root(""), _uploadStore(""), _rootSet(false), _autoindex(false), _autoindexSet(false),
+	_hasMethods(false), _hasIndex(false), _hasRedirect(false), _hasAllowMethods(false), _hasUploadStore(false), _hasCgiPass(false) {}
 
 LocationConfig::~LocationConfig() {}
 
@@ -89,6 +69,167 @@ void	LocationConfig::handleMethods(const std::vector<Token>& tokens, size_t& i)
 	throw ConfigSyntaxException("Error: methods: missing ';'");
 }
 
+void	LocationConfig::handleIndex(const std::vector<Token>& tokens, size_t& i)
+{
+	this->_index.clear();
+	this->_hasIndex = true;
+
+	i++;
+
+	bool hasValue = false;
+
+	while (i < tokens.size())
+	{
+		if (tokens[i].type == TOKEN_SEMICOLON)
+		{
+			if (!hasValue)
+				throw ConfigSyntaxException("Error: index requires at least one value");
+			i++;
+			return;
+		}
+
+		if (tokens[i].type != TOKEN_WORD)
+			throw ConfigSyntaxException("Error: index: invalid token");
+
+		const std::string&	name = tokens[i].value;
+
+		for (size_t j = 0; j < this->_index.size(); j++)
+		{
+			if (this->_index[j] == name)
+				throw ConfigSemanticException("Error: duplicate index: " + name);
+		}
+
+		this->_index.push_back(name);
+		hasValue = true;
+		i++;
+	}
+	throw ConfigSyntaxException("Error: index: missing ';'");
+}
+
+void	LocationConfig::handleReturn(const std::vector<Token>& tokens, size_t& i)
+{
+	if (this->_hasRedirect)
+		throw ConfigSemanticException("Error: duplicate return directive");
+
+	i++; // "return"
+
+	if (i >= tokens.size() || tokens[i].type != TOKEN_WORD || !isNumber(tokens[i].value))
+		throw ConfigSyntaxException("Error: return requires status code");
+
+	int	status = std::atoi(tokens[i].value.c_str());
+	if (status < 300 || status > 399)
+		throw ConfigSemanticException("Error: return status must be 3xx");
+
+	i++;
+
+	if (i >= tokens.size() || tokens[i].type != TOKEN_WORD)
+		throw ConfigSyntaxException("Error: return requires target");
+
+	std::string target = tokens[i].value;
+	i++;
+
+	if (i >= tokens.size() || tokens[i].type != TOKEN_SEMICOLON)
+		throw ConfigSyntaxException("Error: missing ';' after return");
+
+	i++;
+
+	this->_redirect.status = status;
+	this->_redirect.target = target;
+	this->_hasRedirect = true;
+}
+
+void LocationConfig::handleAllowMethods(const std::vector<Token>& tokens, size_t& i)
+{
+	this->_allowMethods.clear();
+	this->_hasAllowMethods = true;
+
+	i++; // "allow_methods"
+
+	bool	hasValue = false;
+
+	while (i < tokens.size())
+	{
+		if (tokens[i].type == TOKEN_SEMICOLON)
+		{
+			if (!hasValue)
+				throw ConfigSyntaxException("Error: allow_methods requires at least one value");
+			i++;
+			return;
+		}
+
+		if (tokens[i].type != TOKEN_WORD)
+			throw ConfigSyntaxException("Error: allow_methods: invalid token");
+
+		const std::string& met = tokens[i].value;
+		if (met != "GET" && met != "POST" && met != "DELETE")
+			throw ConfigSyntaxException("Error: allow_methods: unknown method " + met);
+
+		for (size_t j = 0; j < this->_allowMethods.size(); j++)
+			if (this->_allowMethods[j] == met)
+				throw ConfigSemanticException("Error: duplicate allow_methods: " + met);
+
+		this->_allowMethods.push_back(met);
+		hasValue = true;
+		i++;
+	}
+	throw ConfigSyntaxException("Error: allow_methods: missing ';'");
+}
+
+/* 문법: upload_store /var/www/uploads; */
+void	LocationConfig::handleUploadStore(const std::vector<Token>& tokens, size_t& i)
+{
+	if (this->_hasUploadStore)
+		throw ConfigSemanticException("Error: duplicate upload_store directive");
+
+	const Token&	uploadValue = directiveSyntaxCheck(tokens, i, "upload_store");
+
+	if (uploadValue.value.empty())
+		throw ConfigSemanticException("Error: upload_store path is empty");
+
+	this->_uploadStore = uploadValue.value;
+	this->_hasUploadStore = true;
+}
+
+/* 문법: cgi_pass .php /usr/bin/php-cgi;
+		cgi_pass .py  /usr/bin/python3;
+		
+	key: .php | value: /usr/bin/php-cgi
+*/
+void	LocationConfig::handleCgiPass(const std::vector<Token>& tokens, size_t& i)
+{
+	i++; // "cgi_pass"
+
+	// extension
+	if (i >= tokens.size() || tokens[i].type != TOKEN_WORD)
+		throw ConfigSyntaxException("Error: cgi_pass requires extension");
+
+	std::string	ext = tokens[i].value;
+	if (ext.empty() || ext[0] != '.')
+		throw ConfigSemanticException("Error: cgi_pass extension must start with '.'");
+
+	i++;
+
+	// executable
+	if (i >= tokens.size() || tokens[i].type != TOKEN_WORD)
+		throw ConfigSyntaxException("Error: cgi_pass requires executable path");
+
+	std::string exec = tokens[i].value;
+	i++;
+
+	// semicolon
+	if (i >= tokens.size() || tokens[i].type != TOKEN_SEMICOLON)
+		throw ConfigSyntaxException("Error: missing ';' after cgi_pass");
+
+	i++;
+
+	// duplicate extension check
+	if (this->_cgiPass.count(ext))
+		throw ConfigSemanticException("Error: duplicate cgi_pass for extension: " + ext);
+
+	this->_cgiPass[ext] = exec;
+	this->_hasCgiPass = true;
+}
+
 void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -97,8 +238,18 @@ void	LocationConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleRoot(tokens, i);
 	else if (field == "autoindex")
 		handleAutoindex(tokens, i);
+	else if (field == "index")
+		handleIndex(tokens, i);
+	else if (field == "return")
+		handleReturn(tokens, i);
 	else if (field == "methods")
 		handleMethods(tokens, i);
+	else if (field == "allow_methods")
+		handleAllowMethods(tokens, i);
+	else if (field == "upload_store")
+		handleUploadStore(tokens, i);
+	else if (field == "cgi_pass")
+		handleCgiPass(tokens, i);
 	else
 		throw ConfigSemanticException("Error: Unknown location directive: " + field);
 }
@@ -113,6 +264,7 @@ void	LocationConfig::validatePath() const
 		throw ConfigSemanticException("Error: Location path must start whit '/'");
 }
 
+/* 필수 검사만 수행하는 함수 */
 void	LocationConfig::validateLocationBlock()
 {
 	validatePath();
@@ -132,3 +284,19 @@ bool	LocationConfig::getAutoindex(void) const { return this->_autoindex; }
 bool	LocationConfig::hasMethods(void) const { return this->_hasMethods; }
 
 const std::vector<std::string>&	LocationConfig::getMethods(void) const { return this->_methods; }
+
+bool	LocationConfig::hasRedirect(void) const { return this->_hasRedirect; }
+
+const Redirect&	LocationConfig::getRedirect(void) const { return this->_redirect; }
+
+bool	LocationConfig::hasAllowMethods(void) const { return this->_hasAllowMethods; }
+
+const std::vector<std::string>& LocationConfig::getAllowMethods(void) const { return this->_allowMethods; }
+
+bool	LocationConfig::hasUploadStore(void) const { return this->_hasUploadStore; } // true or false
+
+const std::string&	LocationConfig::getUploadStore(void) const { return this->_uploadStore; } // "/tmp/uploads"
+
+bool	LocationConfig::hasCgiPass(void) const { return this->_hasCgiPass; }
+
+const std::map<std::string, std::string>&	LocationConfig::getCgiPass(void) const { return this->_cgiPass; }

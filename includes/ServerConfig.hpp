@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:12 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/08 07:39:18 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/10 16:23:55 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,8 +16,10 @@
 #include "Token.hpp" // <string>은 Token.hpp에 있음
 #include "LocationConfig.hpp"
 #include "ConfigException.hpp"
+#include "ConfigTypes.hpp"
+#include "ConfigUtils.hpp"
 #include <vector>
-#include <stdexcept>
+#include <cstdlib> // std::atol
 
 class	ServerConfig
 {
@@ -25,26 +27,44 @@ class	ServerConfig
 		ServerConfig(void);
 		~ServerConfig(void);
 
-    		/* getter */
+		/* listen = server / location 전용 flag (serverConfig 전용) */
+		struct	ListenAddress
+		{
+			std::string	ip;
+			int			port;
+		};
+
+    	/* getter */
 		std::vector<int> getListenPorts(void) const;
 		const std::vector<LocationConfig>& getLocations(void) const;
 		const std::string&				getRoot(void) const;
 		const std::string&				getErrorPage(void) const;
 		bool							hasMethods(void) const;
 		const std::vector<std::string>&	getMethods(void) const;
-		/* TODO: 가상호스트용 필드/게터 추가 예정
-			- std::vector<std::string> _serverNames;
-			- std::string _host; // listen IP 지정 시
+		
+		/* TODO: 가상호스트용 필드/게터 추가 예정: 완료
+			- std::vector<std::string> _serverNames; (O)
+			- std::string _host; // 확장 IP 유효성 검사(IPv4/호스트 이름/IPv6) - 파서의 범위 벗어남 (O)
 		*/
+	
+		/* getter */
+		bool							hasServerNames(void) const;
+		const std::vector<std::string>&	getServerNames(void) const;
+		bool							hasClientMaxBodySize(void) const;
+		size_t							getClientMaxBodySize(void) const;
+		bool							hasIndex(void) const;
+		const std::vector<std::string>&	getIndex(void) const;
+		bool							hasRedirect(void) const;
+		const Redirect&					getRedirect(void) const;
+		bool 							hasAllowMethods(void) const;
+		const std::vector<std::string>&	getAllowMethods(void) const;
+
+
+
 		void							parseDirective(const std::vector<Token> &tokens, size_t &i);
 		void							addLocation(const LocationConfig &location); // location은 server 내부에 종속: ServerConfig가 관리 및 내부에서 통제 가능(캡슐화)
 		void							validateServerBlock(void); // server block 전체 보고 판단: 의미적으로 완성되었는가, 기본값을 채워야 하는가
 
-		struct	ListenAddress
-		{
-			std::string	ip;
-			int			port;
-		};
 	
 	private:
 		/* semantic handlersfuncs */
@@ -52,6 +72,13 @@ class	ServerConfig
 		void	handleRoot(const std::vector<Token> &tokens, size_t &i);
 		void	handleErrorPage(const std::vector<Token> &tokens, size_t &i);
 		void	handleMethods(const std::vector<Token>& tokens, size_t& i);
+		void	handleClientMaxBodySize(const std::vector<Token>& tokens, size_t& i);
+		void	handleIndex(const std::vector<Token>& tokens, size_t& i);
+		void	handleReturn(const std::vector<Token>& tokens, size_t& i);
+		void	handleAllowMethods(const std::vector<Token>& tokens, size_t& i);
+		
+		/* server name handlers */
+		void	handleServerName(const std::vector<Token>& tokens, size_t& i);
 
 		void	duplicateLocationPathCheck(void) const;
 		void	applyDefaultErrorPage(void);
@@ -68,6 +95,20 @@ class	ServerConfig
 		/* methods */
 		std::vector<std::string>	_methods;
 		bool						_hasMethods;
+		
+		/* server 그외 필드 */
+		std::vector<std::string>	_serverNames;
+		bool						_hasServerNames;
+		size_t						_clientMaxBodySize;
+		bool						_hasClientMaxBodySize;
+		std::vector<std::string>	_index;
+		bool						_hasIndex;
+		Redirect					_redirect;
+		bool						_hasRedirect;
+
+		/* allow_methods (methods와 완전히 분리된 필드) */
+		std::vector<std::string>	_allowMethods;
+		bool						_hasAllowMethods;
 };
 
 #endif
