@@ -27,6 +27,11 @@ Config::Config(const std::string &filePath)
 
 Config::~Config() {}
 
+const std::vector<ServerConfig>&	Config::getServers(void) const
+{
+	return this->_servers;
+}
+
 /*	openConfigFile()은 파일 열기(열수 있는지 검사), 파일 내부의 버퍼를 내보내는 함수로만 진행 (내부 검사 x)
 	중첩구조 파싱을 더 편하게 하기 위해 파일 내부에 문자열 버퍼를 다 꺼내서 문자배열(일자형태)로 리턴이 목표 */
 std::string	Config::openConfigFile(const std::string &filePath)
@@ -64,6 +69,7 @@ std::string	Config::openConfigFile(const std::string &filePath)
 void	Config::configParse()
 {
 	LocationConfig	*currentLocation = 0; // location은 있을수도 있고, 없을 수도 있음(생성자 만들지 않음, 그래서 pointer 변수)
+	this->_servers.clear();
 
 	try
 	{

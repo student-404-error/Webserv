@@ -41,6 +41,7 @@ class	Config
 		~Config(void);
 
 		void	configParse(void);
+		const std::vector<ServerConfig>&	getServers(void) const;
 		//void	validateDirective(size_t &i); // ServerConfig::handler에서 각자 검사(조건이 다 다름)
 	
 	private:
