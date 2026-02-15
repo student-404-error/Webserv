@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <cerrno>
 #include <sstream>
+#include <cctype>
 
 static void fatal(const char* msg) {
     perror(msg);
@@ -43,6 +44,7 @@ Server::Server(const std::vector<ServerConfig>& cfgs)
         setNonBlocking(fd);
         _listenFds.push_back(fd);
         _listenFdSet.insert(fd);
+        _listenFdToPort[fd] = port;
 
         pollfd p;
         p.fd = fd;
@@ -142,6 +144,7 @@ void Server::acceptLoop(int listenFd) {
 
         Connection* conn = new Connection(cfd);
         _conns[cfd] = conn;
+        _clientPort[cfd] = _listenFdToPort[listenFd];
 
         pollfd p;
         p.fd = cfd;
@@ -235,6 +238,7 @@ void Server::removeConn(int fd) {
         delete it->second;
         _conns.erase(it);
     }
+    _clientPort.erase(fd);
     for (size_t i = 0; i < _pfds.size(); ++i) {
         if (isListenFd(_pfds[i].fd)) continue; // 리스너는 제거 대상 아님
         if (_pfds[i].fd == fd) {
@@ -313,22 +317,112 @@ bool Server::isListenFd(int fd) const {
     return _listenFdSet.find(fd) != _listenFdSet.end();
 }
 
+std::string Server::extractHostName(const HttpRequest& req) const {
+    const std::map<std::string, std::string>& headers = req.getHeaders();
+    std::map<std::string, std::string>::const_iterator it = headers.find("host");
+    if (it == headers.end())
+        return "";
+
+    std::string host = it->second;
+    while (!host.empty() && std::isspace(static_cast<unsigned char>(host[0])))
+        host.erase(0, 1);
+    while (!host.empty() && std::isspace(static_cast<unsigned char>(host[host.size() - 1])))
+        host.erase(host.size() - 1);
+
+    if (host.empty())
+        return "";
+
+    if (host[0] == '[') {
+        size_t end = host.find(']');
+        if (end != std::string::npos)
+            return host.substr(0, end + 1);
+        return host;
+    }
+
+    size_t colon = host.find(':');
+    if (colon != std::string::npos)
+        return host.substr(0, colon);
+    return host;
+}
+
+const ServerConfig& Server::pickServerConfig(int fd, const HttpRequest& req) const {
+    std::map<int, int>::const_iterator pIt = _clientPort.find(fd);
+    int port = (pIt != _clientPort.end()) ? pIt->second : _port;
+    const std::string host = extractHostName(req);
+
+    const ServerConfig* fallback = NULL;
+    for (size_t i = 0; i < _configs.size(); ++i) {
+        const ServerConfig& cfg = _configs[i];
+        const std::vector<int> ports = cfg.getListenPorts();
+        bool matchPort = false;
+        for (size_t j = 0; j < ports.size(); ++j) {
+            if (ports[j] == port) {
+                matchPort = true;
+                break;
+            }
+        }
+        if (!matchPort)
+            continue;
+
+        if (!fallback)
+            fallback = &cfg;
+
+        if (host.empty())
+            continue;
+
+        if (cfg.hasServerNames()) {
+            const std::vector<std::string>& names = cfg.getServerNames();
+            for (size_t k = 0; k < names.size(); ++k) {
+                if (names[k] == host)
+                    return cfg;
+            }
+        }
+    }
+
+    if (fallback)
+        return *fallback;
+    return _configs[0];
+}
+
+bool Server::isMethodAllowed(const ServerConfig& cfg, const std::string& method) const {
+    if (!cfg.hasMethods())
+        return true;
+    const std::vector<std::string>& methods = cfg.getMethods();
+    for (size_t i = 0; i < methods.size(); ++i) {
+        if (methods[i] == method)
+            return true;
+    }
+    return false;
+}
+
 void Server::onRequest(int fd, const HttpRequest& req) {
     Connection* conn = _conns[fd];
 
-    // keep-alive decision (simple)
-    bool keepAlive = true;
+    const ServerConfig& cfg = pickServerConfig(fd, req);
+
+    // keep-alive decision
+    bool keepAlive = (req.getVersion() == "HTTP/1.1");
     const std::map<std::string, std::string>& headers = req.getHeaders();
     std::map<std::string, std::string>::const_iterator connIt = headers.find("connection");
     if (connIt != headers.end()) {
         std::string connHdr = connIt->second;
         if (connHdr == "close" || connHdr == "Close") {
             keepAlive = false;
+        } else if (connHdr == "keep-alive" || connHdr == "Keep-Alive") {
+            keepAlive = true;
         }
     }
 
+    if (conn->requestCount() >= (_maxKeepAlive - 1))
+        keepAlive = false;
+
     HttpResponse resp;
 
+    if (!isMethodAllowed(cfg, req.getMethod())) {
+        resp.setStatus(405);
+        resp.setHeader("Allow", "GET, POST, DELETE");
+        resp.setBody("405 Method Not Allowed\n");
+    } else {
     // URI에서 경로 추출 (쿼리 스트링 제거)
     std::string uri = req.getURI();
     std::string path = uri;
@@ -358,13 +452,10 @@ void Server::onRequest(int fd, const HttpRequest& req) {
         resp.setStatus(404);
         resp.setBody("404 Not Found\n");
     }
+    }
 
     // Connection 헤더 설정
-    if (keepAlive) {
-        resp.setHeader("Connection", "keep-alive");
-    } else {
-        resp.setHeader("Connection", "close");
-    }
+    resp.setKeepAlive(keepAlive, _idleTimeoutSec, _maxKeepAlive);
 
     std::string bytes = resp.toString();
     conn->queueWrite(bytes);

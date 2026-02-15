@@ -37,6 +37,8 @@ private:
 
     std::vector<pollfd> _pfds;               // [0..n) 리스너, 이후 클라이언트
     std::map<int, Connection*> _conns;       // fd -> Connection*
+    std::map<int, int> _listenFdToPort;      // listen fd -> port
+    std::map<int, int> _clientPort;          // client fd -> accepted listen port
 
     // simple in-memory session store
     struct Session {
@@ -61,6 +63,9 @@ private:
 
     // request/response flow
     void onRequest(int fd, const HttpRequest& req);
+    const ServerConfig& pickServerConfig(int fd, const HttpRequest& req) const;
+    std::string extractHostName(const HttpRequest& req) const;
+    bool isMethodAllowed(const ServerConfig& cfg, const std::string& method) const;
 
     // session helpers
     std::string newSessionId();

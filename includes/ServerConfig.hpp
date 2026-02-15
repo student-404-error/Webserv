@@ -30,6 +30,8 @@ class	ServerConfig
 		const std::vector<LocationConfig>& getLocations(void) const;
 		const std::string&				getRoot(void) const;
 		const std::string&				getErrorPage(void) const;
+		bool							hasServerNames(void) const;
+		const std::vector<std::string>&	getServerNames(void) const;
 		bool							hasMethods(void) const;
 		const std::vector<std::string>&	getMethods(void) const;
 		/* TODO: 가상호스트용 필드/게터 추가 예정
@@ -51,6 +53,7 @@ class	ServerConfig
 		void	handleListen(const std::vector<Token> &tokens, size_t &i);
 		void	handleRoot(const std::vector<Token> &tokens, size_t &i);
 		void	handleErrorPage(const std::vector<Token> &tokens, size_t &i);
+		void	handleServerName(const std::vector<Token>& tokens, size_t& i);
 		void	handleMethods(const std::vector<Token>& tokens, size_t& i);
 
 		void	duplicateLocationPathCheck(void) const;
@@ -64,6 +67,10 @@ class	ServerConfig
 		std::string					_root;
 		std::string					_errorPage; // error page path
 		std::vector<LocationConfig>	_locations; // location 중첩 구조: location은 항상 server에 속함, server가 vector로 관리
+
+		/* virtual host */
+		std::vector<std::string>	_serverNames;
+		bool						_hasServerNames;
 
 		/* methods */
 		std::vector<std::string>	_methods;

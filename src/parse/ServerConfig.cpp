@@ -80,7 +80,8 @@ static void	parseListenValue(const std::string& value, std::string& ip, int& por
 		throw ConfigSemanticException("Error: listen: port out of range");
 }
 
-ServerConfig::ServerConfig() : _root(""), _errorPage(""), _hasMethods(false) {}
+ServerConfig::ServerConfig()
+: _root(""), _errorPage(""), _hasServerNames(false), _hasMethods(false) {}
 
 ServerConfig::~ServerConfig() {}
 
@@ -143,6 +144,29 @@ void	ServerConfig::handleMethods(const std::vector<Token>& tokens, size_t& i)
 	throw ConfigSyntaxException("Error: methods: missing ';'");
 }
 
+void	ServerConfig::handleServerName(const std::vector<Token>& tokens, size_t& i)
+{
+	this->_serverNames.clear();
+	this->_hasServerNames = true;
+
+	i++; // pass "server_name"
+	while (i < tokens.size())
+	{
+		if (tokens[i].type == TOKEN_SEMICOLON)
+		{
+			if (this->_serverNames.empty())
+				throw ConfigSyntaxException("Error: server_name: missing value");
+			i++;
+			return;
+		}
+		if (tokens[i].type != TOKEN_WORD)
+			throw ConfigSyntaxException("Error: server_name: invalid token");
+		this->_serverNames.push_back(tokens[i].value);
+		i++;
+	}
+	throw ConfigSyntaxException("Error: server_name: missing ';'");
+}
+
 void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -153,7 +177,8 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleRoot(tokens, i);
 	else if (field == "error_page")
 		handleErrorPage(tokens, i);
-	// TODO: server_name 파싱 추가 (다중 값 지원)
+	else if (field == "server_name")
+		handleServerName(tokens, i);
 	// TODO: listen host:port 형태 지원 시 IP 파싱 추가
 	else if (field == "methods")
 		handleMethods(tokens, i);
@@ -231,6 +256,16 @@ const std::string& ServerConfig::getErrorPage() const
 const std::vector<LocationConfig>& ServerConfig::getLocations() const
 {
 	return this->_locations;
+}
+
+bool	ServerConfig::hasServerNames(void) const
+{
+	return this->_hasServerNames;
+}
+
+const std::vector<std::string>&	ServerConfig::getServerNames(void) const
+{
+	return this->_serverNames;
 }
 
 void	ServerConfig::validateServerBlock()
