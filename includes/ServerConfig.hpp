@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:12 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/10 16:23:55 by princessj        ###   ########.fr       */
+/*   Updated: 2026/02/16 22:38:18 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,11 +41,6 @@ class	ServerConfig
 		const std::string&				getErrorPage(void) const;
 		bool							hasMethods(void) const;
 		const std::vector<std::string>&	getMethods(void) const;
-		
-		/* TODO: 가상호스트용 필드/게터 추가 예정: 완료
-			- std::vector<std::string> _serverNames; (O)
-			- std::string _host; // 확장 IP 유효성 검사(IPv4/호스트 이름/IPv6) - 파서의 범위 벗어남 (O)
-		*/
 	
 		/* getter */
 		bool							hasServerNames(void) const;
@@ -86,7 +81,6 @@ class	ServerConfig
 		void	validateListenDirective(void) const;
 		void	checkDuplicateListen(const std::string& ip, int port) const;
 	
-		/* 대표적인 server level 필드 - 추후 더 추가 예정 (TODO) 회의 해야함) */
 		std::vector<ListenAddress>	_listen;
 		std::string					_root;
 		std::string					_errorPage; // error page path
