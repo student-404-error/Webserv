@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   HttpRequest.cpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: jaoh <jaoh@student.42.fr>                  +#+  +:+       +#+        */
+/*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/20 16:24:43 by jaoh              #+#    #+#             */
-/*   Updated: 2026/02/13 12:28:33 by jaoh             ###   ########.fr       */
+/*   Updated: 2026/02/17 02:22:00 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,7 +23,8 @@ HttpRequest::HttpRequest()
       error(false),
       contentLength(0),
       chunked(false),
-      bodyStart(0) {}
+      bodyStart(0),
+      consumedLength(0) {}
 
 // 소켓에서 새로 읽은 데이터를 rawBuffer에 이어 붙이고,
 // 헤더/바디를 순차적으로 파싱한다.
@@ -31,16 +32,46 @@ HttpRequest::HttpRequest()
 bool HttpRequest::appendData(const std::string& data) {
     rawBuffer += data;
 
+    // CHECK) 전체 요청 크기 제한 검사
+    if (rawBuffer.size() > MAX_REQUEST_SIZE)
+    {
+        error = true;
+        setError(ERROR_REQUEST_TOO_LARGE);
+        return false;
+    }
+
     // 아직 헤더를 다 읽지 못했다면, 헤더 끝("\r\n\r\n")을 찾는다.
     if (!headersParsed) {
         size_t pos = rawBuffer.find("\r\n\r\n");
-        if (pos == std::string::npos)
+        
+        // CHECK)
+        if (pos != std::string::npos)
+        {
+            if (pos > MAX_HEADER_SIZE)
+            {
+                error = true;
+                setError(ERROR_HEADER_TOO_LARGE);
+                return false;
+            }
+
+            parseHeaders(rawBuffer.substr(0, pos));
+
+            if (error)
+                return false;
+            
+            bodyStart = pos + 4;
+            headersParsed = true;
+        }
+        else
             return false;
 
+        //if (pos == std::string::npos)
+            //return false;
+
         // 헤더 블록(첫 줄 + 헤더들)을 잘라서 파싱
-        parseHeaders(rawBuffer.substr(0, pos));
-        bodyStart = pos + 4;
-        headersParsed = true;
+        //parseHeaders(rawBuffer.substr(0, pos));
+        //bodyStart = pos + 4;
+        //headersParsed = true;
     }
 
     // 헤더 파싱이 끝난 이후에는 바디를 파싱
@@ -57,10 +88,29 @@ bool HttpRequest::appendData(const std::string& data) {
 // "GET /index.html HTTP/1.1" 형식의 첫 줄을 method, uri, version 으로 분리
 void HttpRequest::parseRequestLine(const std::string& line) {
     std::stringstream ss(line);
-    ss >> method >> uri >> version;
+    //ss >> method >> uri >> version;
 
-    if (method.empty() || uri.empty() || version.empty())
+    // CHECK)
+    std::string extra; // 토큰이 3개 초과인지 확인하는 장치 : 잘못된 요청 ex) GET / HTTP/1.1 EXTRA
+    ss >> method >> uri >> version >> extra;
+
+    if (method.empty() || uri.empty() || version.empty() || !extra.empty())
+    {
         error = true;
+        return ;
+    }
+    
+    if (version != "HTTP/1.1")
+    {
+        error = true;
+        return ;
+    }
+    
+    if (uri.length() > MAX_URI_LENGTH)
+    {
+        error = true;
+        return ;
+    }
 }
 
 // 첫 줄(요청 라인) 이후의 헤더들을 한 줄씩 읽어 파싱
@@ -72,12 +122,28 @@ void HttpRequest::parseHeaders(const std::string& block) {
     std::getline(iss, line);
     if (line.size() && line[line.size() - 1] == '\r')
         line.erase(line.size() - 1);
+    
+    // CHECK) ex)GET /aaaaaaa...(10000자)... HTTP/1.1
+    if (line.length() > MAX_LINE_LENGTH)
+    {
+        error = true;
+        return ;
+    }
+
     parseRequestLine(line);
 
     // 나머지 줄들은 "Key: Value" 형식의 헤더
     while (std::getline(iss, line)) {
         if (line.size() && line[line.size() - 1] == '\r')
             line.erase(line.size() - 1);
+        
+        // CHECK) Header line 길이 제한 : ex) Host: aaaaaaaaaaaaa...(10000글자)
+        if (line.length() > MAX_LINE_LENGTH)
+        {
+            error = true;
+            return ;
+        }
+        
         if (line.empty())
             break;
 
@@ -90,7 +156,23 @@ void HttpRequest::parseHeaders(const std::string& block) {
         std::string key = toLower(trim(line.substr(0, pos)));
         std::string value = trim(line.substr(pos + 1));
 
+        /* TODO) 팀원들 확인 - http 디테일 파싱 수정 */
+        /* Content-Length가 여러 개 있을 경우: 값이 같아야 한다, 다르면 400 처리 */
+        /* Content-Length가 여러개 있을 수 있음 (단, 값이 모두 동일해야함) */
+        /* CEHCK) 하지만 우리는 nginx 수준의 완전한 RFC 구현을 요구하지 않기 때문에 그냥 중복 Content-Length는 그냥 400 처리로 진행: 중복 Content-Length 값까지 비교 검사는 진행 안함 */
+        if (key == "content-length" && headers.find(key) != headers.end()) // find()가 못 찾으면 end()를 반환: 중복 검사
+        {
+            error = true;
+            return ;
+        }
+
         headers[key] = value;
+        // CHECK) header 개수 제한
+        if (headers.size() > MAX_HEADERS_COUNT)
+        {
+            error = true;
+            return ;
+        }
     }
 
     // Content-Length 가 있으면 바디 길이 설정
@@ -117,7 +199,12 @@ bool HttpRequest::parseBody() {
             return false;
 
         body = rawBuffer.substr(bodyStart, contentLength);
+        // CHECK)
+        consumedLength = bodyStart + contentLength;
     }
+    // CHECK)
+    else
+        consumedLength = bodyStart;
 
     bodyParsed = true;
     complete = true;
@@ -135,11 +222,51 @@ bool HttpRequest::parseChunkedBody() {
             return false;
 
         std::string hexSize = rawBuffer.substr(pos, crlf - pos);
-        size_t chunkSize = std::strtoul(hexSize.c_str(), NULL, 16);
+
+        // CHECK) 빈 size는 에러
+        if (hexSize.empty())
+        {
+            error = true;
+            return false;
+        }
+
+        // CHECK) 16진수 검사
+        for (size_t i = 0; i < hexSize.size(); ++i)
+        {
+            if (!std::isxdigit(hexSize[i]))
+            {
+                error = true;
+                return false;
+            }
+        }
+        
+        // CEHCK) hex -> size_t 변환
+        std::istringstream  iss(hexSize);
+        size_t  chunkSize;
+        iss >> std::hex >> chunkSize;
+
+        if (iss.fail())
+        {
+            error = true;
+            return false;
+        }
+
+        //size_t chunkSize = std::strtoul(hexSize.c_str(), NULL, 16);
 
         pos = crlf + 2;
 
         if (chunkSize == 0) {
+            // CHECK) 반드시 마지막 CRLF 존재해야 함
+            if (rawBuffer.size() < (pos + 2))
+                return false; // 아직 다 안 들어옴
+
+            if (rawBuffer.substr(pos, 2) != "\r\n")
+            {
+                error = true;
+                return false;
+            }
+
+            consumedLength = pos + 2; // 마지막 CRLF 포함 (0\r\n 까지 읽은 위치 -> 하지만 chunked는 0\r\n\r\n으로 끝나므로 마지막 \r\n 2바이트를 더 포함)
             bodyParsed = true;
             complete = true;
             return true;
@@ -148,6 +275,13 @@ bool HttpRequest::parseChunkedBody() {
         if (rawBuffer.size() < pos + chunkSize + 2)
             return false;
 
+        // CHECK) chunk 데이터 뒤 CRLF 검사
+        if (rawBuffer.substr(pos + chunkSize, 2) != "\r\n")
+        {
+            error = true;
+            return false;
+        }
+            
         body.append(rawBuffer.substr(pos, chunkSize));
         pos += chunkSize + 2; // skip data + CRLF
     }
