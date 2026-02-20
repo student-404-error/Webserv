@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   HttpRequest.hpp                                    :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: jaoh <jaoh@student.42.fr>                  +#+  +:+       +#+        */
+/*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/12/20 16:24:57 by jaoh              #+#    #+#             */
-/*   Updated: 2026/02/13 12:28:31 by jaoh             ###   ########.fr       */
+/*   Updated: 2026/02/17 01:03:04 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -55,6 +55,9 @@ public:
     const std::string& getVersion() const;
     const std::map<std::string, std::string>& getHeaders() const;
     const std::string& getBody() const;
+
+    // CHECK) getter 추가
+    size_t  getConsumedLength() const;
     
     // 타임아웃 체크 (마지막 데이터 수신 시각 기준)
     void updateLastActivity();
@@ -116,6 +119,14 @@ private:
     static const size_t MAX_URI_LENGTH = 2048;                 // 2KB
     static const size_t MAX_LINE_LENGTH = 8192;                // 8KB
     static const size_t MAX_HEADERS_COUNT = 100;               // 100개
+
+    // CHECK)
+    // ex) rawBuffer에 [요청1][요청2] 있다고 가정
+    // 요청1 길이 = 52 bytes : consumedLength = 52
+    // server에서 in.erase(0, 52); -> 다음 버퍼(요청 2)를 읽기 위해
+    // [요청2]만 남음
+    // 이 작업을 위해 멤버변수 생성
+    size_t consumedLength;
 };
 
 #endif

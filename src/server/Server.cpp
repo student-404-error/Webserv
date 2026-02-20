@@ -1,4 +1,6 @@
 #include "Server.hpp"
+#include "HttpParseResult.hpp"
+#include "HttpRequestValidator.hpp"
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
@@ -156,7 +158,105 @@ void Server::acceptLoop(int listenFd) {
     }
 }
 
-void Server::handleClientEvent(size_t idx) {
+// CHECK)
+void    Server::handleClientEvent(size_t idx)
+{
+    int fd = _pfds[idx].fd;
+    Connection* conn = 0;
+
+    std::map<int, Connection*>::iterator it = _conns.find(fd);
+    if (it == _conns.end()) {
+        removeConn(fd);
+        return;
+    }
+    conn = it->second;
+
+    short ev = _pfds[idx].revents;
+
+    if (ev & (POLLERR | POLLHUP | POLLNVAL)) {
+        removeConn(fd);
+        return;
+    }
+
+    if (ev & POLLIN) {
+        if (!conn->onReadable()) { removeConn(fd); return; }
+
+        // =====================================================
+        // [HTTP/1.1 Validator 기반 보강 로직]
+        // - 명세 기반 상태코드 분기
+        // - Host 필수 검증
+        // - Version 검사
+        // - Method 구현 여부 검사
+        // =====================================================
+
+        while (true)
+        {
+            HttpRequest req;
+            std::string& in = conn->inBuf();
+
+            // raw buffer 기반 파싱 시도
+            req.appendData(in);
+
+            // 명세 기반 검증 수행
+            HttpParseResult result = HttpRequestValidator::validate(req);
+
+            // 1) 아직 데이터 부족 (partial read)
+            if (result.getStatus() == HttpParseResult::PARSE_NEED_MORE)
+            {
+                break ;
+            }
+
+            // 2) 파싱 에러 (정확한 HTTP 상태코드 사용)
+            // TODO (B-part)
+            // config의 error_page 설정과 연동 필요
+            // 현재는 기본 상태코드만 반환
+            // 추후 ServerConfig 기반 error_page lookup 구현 예정
+            if (result.getStatus() == HttpParseResult::PARSE_ERROR)
+            {
+                HttpResponse    resp;
+                resp.setStatus(result.getHttpStatusCode());
+                resp.setBody(""); // config error page 기능과 충돌방지 : config ex) error_page 400 /400.html;
+                // 바디를 강제로 넣으면 config 기반 error_page 로직과 충돌
+
+                std::string bytes = resp.toString();
+                conn->queueWrite(bytes);
+                conn->closeAfterWrite();
+                break ;
+            }
+
+            // 3) 정상 파싱 완료
+            if (result.getStatus() == HttpParseResult::PARSE_COMPLETE)
+            {
+                // 두번째 요청 있을 경우, 첫번째 요청(consumedLength)까지 지우기 -> 다음 요청을 남겨둬야함
+                in.erase(0, result.getConsumedLength());
+
+                conn->incRequestCount();
+                onRequest(fd, req);
+
+                if (conn->shouldCloseAfterWrite())
+                    break ;
+                if (conn->requestCount() >= _maxKeepAlive)
+                {
+                    conn->closeAfterWrite();
+                    break ;
+                }
+            }
+        }
+    }
+
+    if (ev & POLLOUT) {
+        if (!conn->onWritable()) { removeConn(fd); return ; }
+    }
+
+    updatePollEventsFor(fd);
+    _pfds[idx].revents = 0;
+}
+
+
+// =========================
+// [기존 코드 - 유지용]
+// =========================
+/*void Server::handleClientEvent(size_t idx) {
     int fd = _pfds[idx].fd;
     Connection* conn = 0;
 
@@ -217,7 +317,7 @@ void Server::handleClientEvent(size_t idx) {
 
     updatePollEventsFor(fd);
     _pfds[idx].revents = 0;
-}
+}*/
 
 void Server::updatePollEventsFor(int fd) {
     Connection* conn = _conns[fd];
