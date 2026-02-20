@@ -69,6 +69,7 @@ void	Config::handleGlobalState(ParserContext& ctx)
 	{
 		if (ctx.serverOpened)
 			throw ConfigSyntaxException("Error: unclosed server block at end of file");
+		ctx.i++; // EOF consumed: stop parse loop
 		return ;
 	}
 
