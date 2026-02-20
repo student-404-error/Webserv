@@ -115,12 +115,13 @@ std::map<std::string, std::string> CgiHandler::buildEnv(
     
     // PATH_INFO와 PATH_TRANSLATED 설정
     std::string pathInfo = request.getURI();
-    size_t scriptNamePos = pathInfo.find(location.path);
+    const std::string& locPath = location.getPath();
+    size_t scriptNamePos = pathInfo.find(locPath);
     if (scriptNamePos != std::string::npos) {
-        pathInfo = pathInfo.substr(scriptNamePos + location.path.size());
+        pathInfo = pathInfo.substr(scriptNamePos + locPath.size());
     }
     env["PATH_INFO"] = pathInfo;
-    env["PATH_TRANSLATED"] = location.root + pathInfo;
+    env["PATH_TRANSLATED"] = (location.hasRoot() ? location.getRoot() : "") + pathInfo;
 
     // Query string (URI에 ? 이후)
     size_t qPos = request.getURI().find('?');
@@ -302,8 +303,9 @@ void CgiHandler::parseCgiOutput(const std::string& output,
 std::string CgiHandler::buildScriptPath(const std::string& uri,
                                        const LocationConfig& location) const {
     std::string rel = uri;
-    if (uri.compare(0, location.path.size(), location.path) == 0)
-        rel = uri.substr(location.path.size());
+    const std::string& locPath = location.getPath();
+    if (uri.compare(0, locPath.size(), locPath) == 0)
+        rel = uri.substr(locPath.size());
     
     if (!rel.empty() && rel[0] == '/')
         rel.erase(0, 1);
@@ -317,7 +319,7 @@ std::string CgiHandler::buildScriptPath(const std::string& uri,
     if (rel.find("..") != std::string::npos)
         return "";
 
-    std::string result = location.root;
+    std::string result = location.hasRoot() ? location.getRoot() : "";
     if (!result.empty() && result[result.size() - 1] != '/')
         result += "/";
     result += rel;
@@ -327,7 +329,6 @@ std::string CgiHandler::buildScriptPath(const std::string& uri,
 
 std::string CgiHandler::getInterpreter(const std::string& path,
                                       const LocationConfig& location) const {
-    (void)location;
     // 확장자 추출
     size_t dot = path.find_last_of('.');
     if (dot == std::string::npos)
@@ -335,11 +336,14 @@ std::string CgiHandler::getInterpreter(const std::string& path,
 
     std::string ext = path.substr(dot);
 
-    // location.cgiInterpreters에서 매핑 찾기
-    // 예: {".php": "/usr/bin/php-cgi", ".py": "/usr/bin/python3"}
-    // 실제로는 LocationConfig에 cgiInterpreters 필드 추가 필요
+    if (location.hasCgiPass()) {
+        const std::map<std::string, std::string>& pass = location.getCgiPass();
+        std::map<std::string, std::string>::const_iterator it = pass.find(ext);
+        if (it != pass.end())
+            return it->second;
+    }
     
-    // 임시 하드코딩 (실제로는 설정에서 가져와야 함)
+    // fallback 하드코딩
     if (ext == ".php")
         return "/usr/bin/php-cgi";
     if (ext == ".py")

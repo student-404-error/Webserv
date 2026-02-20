@@ -85,10 +85,11 @@ HttpResponse DELETEHandler::handle(const HttpRequest& request,
 std::string DELETEHandler::buildPath(const std::string& uri,
                                      const LocationConfig& location) const {
     std::string rel = uri;
+    const std::string& locPath = location.getPath();
     
     // location.path prefix 제거
-    if (uri.compare(0, location.path.size(), location.path) == 0)
-        rel = uri.substr(location.path.size());
+    if (uri.compare(0, locPath.size(), locPath) == 0)
+        rel = uri.substr(locPath.size());
     
     if (!rel.empty() && rel[0] == '/')
         rel.erase(0, 1);
@@ -112,7 +113,7 @@ std::string DELETEHandler::buildPath(const std::string& uri,
         return "";
     
     // 최종 경로 조합
-    std::string result = location.root;
+    std::string result = location.hasRoot() ? location.getRoot() : "";
     if (!result.empty() && result[result.size() - 1] != '/')
         result += "/";
     if (!rel.empty())

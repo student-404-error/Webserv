@@ -285,6 +285,10 @@ bool	LocationConfig::hasMethods(void) const { return this->_hasMethods; }
 
 const std::vector<std::string>&	LocationConfig::getMethods(void) const { return this->_methods; }
 
+bool	LocationConfig::hasIndex(void) const { return this->_hasIndex; }
+
+const std::vector<std::string>&	LocationConfig::getIndex(void) const { return this->_index; }
+
 bool	LocationConfig::hasRedirect(void) const { return this->_hasRedirect; }
 
 const Redirect&	LocationConfig::getRedirect(void) const { return this->_redirect; }

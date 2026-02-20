@@ -56,13 +56,16 @@ HttpResponse GETHandler::handleDirectory(const std::string& path,
                                         const std::string& uri,
                                         const LocationConfig& location) {
     HttpResponse response;
+    const std::vector<std::string> emptyIndex;
+    const std::vector<std::string>& indexFiles =
+        location.hasIndex() ? location.getIndex() : emptyIndex;
 
     // location.indexFiles 순회하며 존재하는 첫 index 파일 찾기
-    for (size_t i = 0; i < location.indexFiles.size(); ++i) {
+    for (size_t i = 0; i < indexFiles.size(); ++i) {
         std::string indexPath = path;
         if (indexPath[indexPath.size() - 1] != '/')
             indexPath += "/";
-        indexPath += location.indexFiles[i];
+        indexPath += indexFiles[i];
 
         struct stat st;
         if (stat(indexPath.c_str(), &st) == 0 && S_ISREG(st.st_mode)) {
@@ -71,7 +74,7 @@ HttpResponse GETHandler::handleDirectory(const std::string& path,
     }
 
     // index 파일이 없고 autoindex가 활성화되어 있으면
-    if (location.autoindex) {
+    if (location.hasAutoindex() && location.getAutoindex()) {
         std::string body = generateAutoIndex(path, uri);
         response.setBody(body);
         response.setContentType("text/html");
@@ -124,8 +127,9 @@ HttpResponse GETHandler::handleFile(const std::string& path,
 std::string GETHandler::buildPath(const std::string& uri,
                                   const LocationConfig& location) const {
     std::string rel = uri;
-    if (uri.compare(0, location.path.size(), location.path) == 0)
-        rel = uri.substr(location.path.size());
+    const std::string& locPath = location.getPath();
+    if (uri.compare(0, locPath.size(), locPath) == 0)
+        rel = uri.substr(locPath.size());
     
     if (!rel.empty() && rel[0] == '/')
         rel.erase(0, 1);
@@ -147,7 +151,7 @@ std::string GETHandler::buildPath(const std::string& uri,
     if (!isPathSafe(rel))
         return "";
     
-    std::string result = location.root;
+    std::string result = location.hasRoot() ? location.getRoot() : "";
     if (!result.empty() && result[result.size() - 1] != '/')
         result += "/";
     if (!rel.empty())
