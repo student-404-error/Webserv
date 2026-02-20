@@ -76,6 +76,8 @@ void	Config::handleGlobalState(ParserContext& ctx)
 
 void	Config::handleServerState(ParserContext& ctx)
 {
+	LocationConfig	*currentLocation = 0; // location은 있을수도 있고, 없을 수도 있음(생성자 만들지 않음, 그래서 pointer 변수)
+	this->_servers.clear();
 	const Token	&token = this->_tokens[ctx.i];
 
 	if (token.type == TOKEN_LBRACE) // '{'
