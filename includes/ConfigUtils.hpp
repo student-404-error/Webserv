@@ -2,6 +2,7 @@
 #define CONFIGUTILS_HPP
 
 #include "Token.hpp"
+#include <vector>
 
 bool			isNumber(const std::string &s);
 const Token&	directiveSyntaxCheck(const std::vector<Token>& tokens, size_t& i, const std::string& directiveName);

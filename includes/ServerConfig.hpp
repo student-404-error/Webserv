@@ -45,8 +45,6 @@ class	ServerConfig
 		const std::vector<std::string>&	getMethods(void) const;
 	
 		/* getter */
-		bool							hasServerNames(void) const;
-		const std::vector<std::string>&	getServerNames(void) const;
 		bool							hasClientMaxBodySize(void) const;
 		size_t							getClientMaxBodySize(void) const;
 		bool							hasIndex(void) const;
@@ -75,9 +73,6 @@ class	ServerConfig
 		void	handleReturn(const std::vector<Token>& tokens, size_t& i);
 		void	handleAllowMethods(const std::vector<Token>& tokens, size_t& i);
 		
-		/* server name handlers */
-		void	handleServerName(const std::vector<Token>& tokens, size_t& i);
-
 		void	duplicateLocationPathCheck(void) const;
 		void	applyDefaultErrorPage(void);
 		void	applyDefaultRoot(void);
@@ -98,8 +93,6 @@ class	ServerConfig
 		bool						_hasMethods;
 		
 		/* server 그외 필드 */
-		std::vector<std::string>	_serverNames;
-		bool						_hasServerNames;
 		size_t						_clientMaxBodySize;
 		bool						_hasClientMaxBodySize;
 		std::vector<std::string>	_index;
