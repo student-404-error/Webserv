@@ -1,6 +1,11 @@
 #include "Server.hpp"
 #include "HttpParseResult.hpp"
 #include "HttpRequestValidator.hpp"
+#include "Router.hpp"
+#include "GetHandler.hpp"
+#include "PostHandler.hpp"
+#include "DeleteHandler.hpp"
+#include "CgiHandler.hpp"
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
@@ -16,6 +21,25 @@
 static void fatal(const char* msg) {
     perror(msg);
     std::exit(1);
+}
+
+static std::string stripQueryString(const std::string& uri) {
+    size_t qpos = uri.find('?');
+    if (qpos == std::string::npos)
+        return uri;
+    return uri.substr(0, qpos);
+}
+
+static bool locationHasCgiForUri(const LocationConfig& loc, const std::string& uri) {
+    if (!loc.hasCgiPass())
+        return false;
+    const std::string path = stripQueryString(uri);
+    size_t dot = path.find_last_of('.');
+    if (dot == std::string::npos)
+        return false;
+    const std::string ext = path.substr(dot);
+    const std::map<std::string, std::string>& pass = loc.getCgiPass();
+    return pass.find(ext) != pass.end();
 }
 
 Server::Server(const std::vector<ServerConfig>& cfgs)
@@ -517,41 +541,57 @@ void Server::onRequest(int fd, const HttpRequest& req) {
         keepAlive = false;
 
     HttpResponse resp;
+    const std::string uriPath = stripQueryString(req.getURI());
 
-    if (!isMethodAllowed(cfg, req.getMethod())) {
-        resp.setStatus(405);
-        resp.setHeader("Allow", "GET, POST, DELETE");
-        resp.setBody("405 Method Not Allowed\n");
-    } else {
-    // URI에서 경로 추출 (쿼리 스트링 제거)
-    std::string uri = req.getURI();
-    std::string path = uri;
-    size_t qpos = uri.find('?');
-    if (qpos != std::string::npos) {
-        path = uri.substr(0, qpos);
-    }
+    Router router;
+    const std::vector<LocationConfig>& locations = cfg.getLocations();
+    for (size_t i = 0; i < locations.size(); ++i)
+        router.addLocation(locations[i]);
+    const LocationConfig* location = router.match(uriPath);
 
-    // ---- Simple routes (session demo) ----
-    if (path == "/") {
-        resp.setBody("Hello from webserv skeleton\nTry /counter\n");
-    }
-    else if (path == "/counter") {
-        Session& s = getOrCreateSession(req, resp);
-        s.counter++;
-
-        std::ostringstream body;
-        body << "session counter = " << s.counter << "\n";
-        resp.setBody(body.str());
-    }
-    else if (path == "/logout") {
-        // expire cookie (very simple)
-        resp.setHeader("Set-Cookie", "sid=deleted; Path=/; Max-Age=0");
-        resp.setBody("logged out\n");
-    }
-    else {
+    if (location == NULL) {
         resp.setStatus(404);
         resp.setBody("404 Not Found\n");
-    }
+    } else {
+        bool allowed = router.isMethodAllowed(location, req.getMethod());
+        if (!allowed && !location->hasAllowMethods() && !location->hasMethods())
+            allowed = isMethodAllowed(cfg, req.getMethod());
+
+        if (!allowed) {
+            resp.setStatus(405);
+            resp.setHeader("Allow", "GET, POST, DELETE");
+            resp.setBody("405 Method Not Allowed\n");
+        } else if (locationHasCgiForUri(*location, req.getURI())) {
+            CgiHandler cgiHandler;
+            resp = cgiHandler.handle(req, *location);
+        } else if (req.getMethod() == "GET") {
+            GETHandler getHandler;
+            resp = getHandler.handle(req, *location);
+        } else if (req.getMethod() == "POST") {
+            size_t maxBody = cfg.hasClientMaxBodySize() ? cfg.getClientMaxBodySize() : 0;
+            POSTHandler postHandler(maxBody);
+            resp = postHandler.handle(req, *location);
+        } else if (req.getMethod() == "DELETE") {
+            DELETEHandler deleteHandler;
+            resp = deleteHandler.handle(req, *location);
+        } else {
+            resp.setStatus(501);
+            resp.setBody("501 Not Implemented\n");
+        }
+
+        // keep the previous simple session demo route as an optional endpoint
+        if (uriPath == "/counter") {
+            Session& s = getOrCreateSession(req, resp);
+            s.counter++;
+            std::ostringstream body;
+            body << "session counter = " << s.counter << "\n";
+            resp.setStatus(200);
+            resp.setBody(body.str());
+        } else if (uriPath == "/logout") {
+            resp.setHeader("Set-Cookie", "sid=deleted; Path=/; Max-Age=0");
+            resp.setStatus(200);
+            resp.setBody("logged out\n");
+        }
     }
 
     // Connection 헤더 설정
