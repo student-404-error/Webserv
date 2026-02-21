@@ -12,8 +12,8 @@
 
 #include "LocationConfig.hpp"
 
-LocationConfig::LocationConfig(const std::string &path) : _path(path), _root(""), _uploadStore(""), _rootSet(false), _autoindex(false), _autoindexSet(false),
-	_hasMethods(false), _hasIndex(false), _hasRedirect(false), _hasAllowMethods(false), _hasUploadStore(false), _hasCgiPass(false) {}
+LocationConfig::LocationConfig(const std::string &path) : _path(path), _root(""), _rootSet(false), _autoindex(false), _autoindexSet(false),
+	_hasMethods(false), _hasIndex(false), _hasRedirect(false), _hasAllowMethods(false), _uploadStore(""), _hasUploadStore(false), _hasCgiPass(false) {}
 
 LocationConfig::~LocationConfig() {}
 

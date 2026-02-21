@@ -21,9 +21,11 @@ HttpRequest::HttpRequest()
       bodyParsed(false),
       complete(false),
       error(false),
+      errorType(ERROR_NONE),
       contentLength(0),
       chunked(false),
       bodyStart(0),
+      lastActivityTime(std::time(NULL)),
       consumedLength(0) {}
 
 // 소켓에서 새로 읽은 데이터를 rawBuffer에 이어 붙이고,
@@ -310,9 +312,58 @@ std::string HttpRequest::toLower(const std::string& s) const {
 
 bool HttpRequest::isComplete() const { return complete; }
 bool HttpRequest::hasError() const { return error; }
+bool HttpRequest::isTimedOut() const { return errorType == ERROR_TIMEOUT; }
 
 const std::string& HttpRequest::getMethod() const { return method; }
 const std::string& HttpRequest::getURI() const { return uri; }
 const std::string& HttpRequest::getVersion() const { return version; }
 const std::map<std::string, std::string>& HttpRequest::getHeaders() const { return headers; }
 const std::string& HttpRequest::getBody() const { return body; }
+size_t HttpRequest::getConsumedLength() const { return consumedLength; }
+
+HttpRequest::ErrorType HttpRequest::getErrorType() const { return errorType; }
+
+std::string HttpRequest::getErrorMessage() const {
+    switch (errorType) {
+        case ERROR_REQUEST_TOO_LARGE: return "request too large";
+        case ERROR_HEADER_TOO_LARGE: return "header too large";
+        case ERROR_LINE_TOO_LONG: return "line too long";
+        case ERROR_INVALID_REQUEST_LINE: return "invalid request line";
+        case ERROR_INVALID_HEADER: return "invalid header";
+        case ERROR_TIMEOUT: return "request timeout";
+        case ERROR_MALFORMED_CHUNKED: return "malformed chunked body";
+        case ERROR_NONE:
+        default:
+            return "";
+    }
+}
+
+void HttpRequest::updateLastActivity() { lastActivityTime = std::time(NULL); }
+
+bool HttpRequest::checkTimeout(int timeoutSeconds) const {
+    return (std::time(NULL) - lastActivityTime) > timeoutSeconds;
+}
+
+void HttpRequest::reset() {
+    rawBuffer.clear();
+    method.clear();
+    uri.clear();
+    version.clear();
+    headers.clear();
+    body.clear();
+    headersParsed = false;
+    bodyParsed = false;
+    complete = false;
+    error = false;
+    errorType = ERROR_NONE;
+    contentLength = 0;
+    chunked = false;
+    bodyStart = 0;
+    consumedLength = 0;
+    lastActivityTime = std::time(NULL);
+}
+
+void HttpRequest::setError(ErrorType type) {
+    error = true;
+    errorType = type;
+}

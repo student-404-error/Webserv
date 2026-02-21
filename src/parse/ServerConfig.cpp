@@ -46,7 +46,7 @@ static void	parseListenValue(const std::string& value, std::string& ip, int& por
 		throw ConfigSemanticException("Error: listen: port out of range");
 }
 
-ServerConfig::ServerConfig() : _root(""), _errorPage(""), _clientMaxBodySize(0), _hasMethods(false), _hasServerNames(false),
+ServerConfig::ServerConfig() : _root(""), _errorPage(""), _hasServerNames(false), _hasMethods(false), _clientMaxBodySize(0),
 	_hasClientMaxBodySize(false), _hasIndex(false), _hasRedirect(false), _hasAllowMethods(false) {}
 
 ServerConfig::~ServerConfig() {}
