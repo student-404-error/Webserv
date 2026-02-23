@@ -53,6 +53,14 @@ class	ServerConfig
 		const Redirect&					getRedirect(void) const;
 		bool 							hasAllowMethods(void) const;
 		const std::vector<std::string>&	getAllowMethods(void) const;
+		bool							hasMaxConnections(void) const;
+		int								getMaxConnections(void) const;
+		bool							hasIdleTimeout(void) const;
+		int								getIdleTimeout(void) const;
+		bool							hasWriteTimeout(void) const;
+		int								getWriteTimeout(void) const;
+		bool							hasKeepAliveMax(void) const;
+		int								getKeepAliveMax(void) const;
 
 
 
@@ -72,6 +80,10 @@ class	ServerConfig
 		void	handleIndex(const std::vector<Token>& tokens, size_t& i);
 		void	handleReturn(const std::vector<Token>& tokens, size_t& i);
 		void	handleAllowMethods(const std::vector<Token>& tokens, size_t& i);
+		void	handleMaxConnections(const std::vector<Token>& tokens, size_t& i);
+		void	handleIdleTimeout(const std::vector<Token>& tokens, size_t& i);
+		void	handleWriteTimeout(const std::vector<Token>& tokens, size_t& i);
+		void	handleKeepAliveMax(const std::vector<Token>& tokens, size_t& i);
 		
 		void	duplicateLocationPathCheck(void) const;
 		void	applyDefaultErrorPage(void);
@@ -103,6 +115,15 @@ class	ServerConfig
 		/* allow_methods (methods와 완전히 분리된 필드) */
 		std::vector<std::string>	_allowMethods;
 		bool						_hasAllowMethods;
+
+		int							_maxConnections;
+		bool						_hasMaxConnections;
+		int							_idleTimeout;
+		bool						_hasIdleTimeout;
+		int							_writeTimeout;
+		bool						_hasWriteTimeout;
+		int							_keepAliveMax;
+		bool						_hasKeepAliveMax;
 };
 
 #endif

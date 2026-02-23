@@ -57,11 +57,11 @@ Server::Server(const std::vector<ServerConfig>& cfgs)
     if (ports.empty())
         throw std::runtime_error("No listen port configured");
 
-    // 기본값 설정 (TODO: config에서 받아오도록 확장)
-    _maxConnections = 1024;
-    _idleTimeoutSec = 15;   // idle/read timeout 기본값
-    _writeTimeoutSec = 10;  // 쓰기 지연 기본값
-    _maxKeepAlive = 100;    // 연결당 최대 요청 수
+    // server-level runtime tuning values (use first server block as global runtime policy)
+    _maxConnections = _configs[0].getMaxConnections();
+    _idleTimeoutSec = _configs[0].getIdleTimeout();
+    _writeTimeoutSec = _configs[0].getWriteTimeout();
+    _maxKeepAlive = _configs[0].getKeepAliveMax();
 
     // 각 포트마다 리스너 생성 및 poll 등록
     for (std::set<int>::const_iterator it = ports.begin(); it != ports.end(); ++it) {
