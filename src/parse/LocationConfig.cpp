@@ -304,3 +304,12 @@ const std::string&	LocationConfig::getUploadStore(void) const { return this->_up
 bool	LocationConfig::hasCgiPass(void) const { return this->_hasCgiPass; }
 
 const std::map<std::string, std::string>&	LocationConfig::getCgiPass(void) const { return this->_cgiPass; }
+
+void	LocationConfig::inheritRootIfUnset(const std::string& serverRoot)
+{
+	if (!this->_rootSet)
+	{
+		this->_root = serverRoot;
+		this->_rootSet = true;
+	}
+}

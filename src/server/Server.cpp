@@ -30,6 +30,12 @@ static std::string stripQueryString(const std::string& uri) {
     return uri.substr(0, qpos);
 }
 
+static std::string toLowerAscii(std::string s) {
+    for (size_t i = 0; i < s.size(); ++i)
+        s[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(s[i])));
+    return s;
+}
+
 static bool locationHasCgiForUri(const LocationConfig& loc, const std::string& uri) {
     if (!loc.hasCgiPass())
         return false;
@@ -459,14 +465,14 @@ std::string Server::extractHostName(const HttpRequest& req) const {
     if (host[0] == '[') {
         size_t end = host.find(']');
         if (end != std::string::npos)
-            return host.substr(0, end + 1);
-        return host;
+            return toLowerAscii(host.substr(0, end + 1));
+        return toLowerAscii(host);
     }
 
     size_t colon = host.find(':');
     if (colon != std::string::npos)
-        return host.substr(0, colon);
-    return host;
+        return toLowerAscii(host.substr(0, colon));
+    return toLowerAscii(host);
 }
 
 const ServerConfig& Server::pickServerConfig(int fd, const HttpRequest& req) const {
@@ -497,7 +503,7 @@ const ServerConfig& Server::pickServerConfig(int fd, const HttpRequest& req) con
         if (cfg.hasServerNames()) {
             const std::vector<std::string>& names = cfg.getServerNames();
             for (size_t k = 0; k < names.size(); ++k) {
-                if (names[k] == host)
+                if (toLowerAscii(names[k]) == host)
                     return cfg;
             }
         }

@@ -455,6 +455,8 @@ void	ServerConfig::validateServerBlock()
 		this->_writeTimeout = DEFAULT_WRITE_TIMEOUT;
 	if (!this->_hasKeepAliveMax)
 		this->_keepAliveMax = DEFAULT_KEEPALIVE_MAX;
+	for (size_t i = 0; i < this->_locations.size(); ++i)
+		this->_locations[i].inheritRootIfUnset(this->_root);
 	duplicateLocationPathCheck(); // 4) location path 중복 검사
 }
 

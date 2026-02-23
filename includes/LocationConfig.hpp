@@ -49,6 +49,7 @@ class	LocationConfig
 		const std::string&				getUploadStore(void) const;
 		bool							hasCgiPass(void) const;
 		const std::map<std::string, std::string>&	getCgiPass(void) const;
+		void							inheritRootIfUnset(const std::string& serverRoot);
 
 
 	private:
