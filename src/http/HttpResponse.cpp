@@ -197,3 +197,7 @@ std::string HttpResponse::toChunkedString() {
 bool HttpResponse::isKeepAlive() const {
     return keepAlive;
 }
+
+int HttpResponse::getStatusCode() const {
+    return statusCode;
+}

@@ -6,6 +6,7 @@
 #include "PostHandler.hpp"
 #include "DeleteHandler.hpp"
 #include "CgiHandler.hpp"
+#include "ErrorHandler.hpp"
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
@@ -243,10 +244,8 @@ void    Server::handleClientEvent(size_t idx)
             // 추후 ServerConfig 기반 error_page lookup 구현 예정
             if (result.getStatus() == HttpParseResult::PARSE_ERROR)
             {
-                HttpResponse    resp;
-                resp.setStatus(result.getHttpStatusCode());
-                resp.setBody(""); // config error page 기능과 충돌방지 : config ex) error_page 400 /400.html;
-                // 바디를 강제로 넣으면 config 기반 error_page 로직과 충돌
+                const ServerConfig& cfg = pickDefaultServerConfigForFd(fd);
+                HttpResponse resp = buildErrorResponse(result.getHttpStatusCode(), cfg);
 
                 std::string bytes = resp.toString();
                 conn->queueWrite(bytes);
@@ -514,6 +513,27 @@ const ServerConfig& Server::pickServerConfig(int fd, const HttpRequest& req) con
     return _configs[0];
 }
 
+const ServerConfig& Server::pickDefaultServerConfigForFd(int fd) const {
+    std::map<int, int>::const_iterator pIt = _clientPort.find(fd);
+    int port = (pIt != _clientPort.end()) ? pIt->second : _port;
+
+    for (size_t i = 0; i < _configs.size(); ++i) {
+        const ServerConfig& cfg = _configs[i];
+        const std::vector<int> ports = cfg.getListenPorts();
+        for (size_t j = 0; j < ports.size(); ++j) {
+            if (ports[j] == port)
+                return cfg;
+        }
+    }
+    return _configs[0];
+}
+
+HttpResponse Server::buildErrorResponse(int code, const ServerConfig& cfg) const {
+    std::map<int, std::string> errorPages;
+    errorPages[code] = cfg.getErrorPage();
+    return ErrorHandler::buildError(code, errorPages);
+}
+
 bool Server::isMethodAllowed(const ServerConfig& cfg, const std::string& method) const {
     if (!cfg.hasMethods())
         return true;
@@ -556,17 +576,15 @@ void Server::onRequest(int fd, const HttpRequest& req) {
     const LocationConfig* location = router.match(uriPath);
 
     if (location == NULL) {
-        resp.setStatus(404);
-        resp.setBody("404 Not Found\n");
+        resp = buildErrorResponse(404, cfg);
     } else {
         bool allowed = router.isMethodAllowed(location, req.getMethod());
         if (!allowed && !location->hasAllowMethods() && !location->hasMethods())
             allowed = isMethodAllowed(cfg, req.getMethod());
 
         if (!allowed) {
-            resp.setStatus(405);
+            resp = buildErrorResponse(405, cfg);
             resp.setHeader("Allow", "GET, POST, DELETE");
-            resp.setBody("405 Method Not Allowed\n");
         } else if (locationHasCgiForUri(*location, req.getURI())) {
             CgiHandler cgiHandler;
             resp = cgiHandler.handle(req, *location);
@@ -581,8 +599,15 @@ void Server::onRequest(int fd, const HttpRequest& req) {
             DELETEHandler deleteHandler;
             resp = deleteHandler.handle(req, *location);
         } else {
-            resp.setStatus(501);
-            resp.setBody("501 Not Implemented\n");
+            resp = buildErrorResponse(501, cfg);
+        }
+
+        if (resp.getStatusCode() >= 400) {
+            int code = resp.getStatusCode();
+            HttpResponse errResp = buildErrorResponse(code, cfg);
+            if (code == 405)
+                errResp.setHeader("Allow", "GET, POST, DELETE");
+            resp = errResp;
         }
 
         // keep the previous simple session demo route as an optional endpoint

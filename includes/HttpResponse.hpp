@@ -47,6 +47,7 @@ public:
     
     // Keep-Alive 상태 확인
     bool isKeepAlive() const;
+    int getStatusCode() const;
 
 private:
     std::string getStatusMessage(int code) const;
