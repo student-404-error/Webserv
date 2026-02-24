@@ -37,6 +37,57 @@ static std::string toLowerAscii(std::string s) {
     return s;
 }
 
+static bool hasMethod(const std::vector<std::string>& methods, const std::string& method) {
+    for (size_t i = 0; i < methods.size(); ++i) {
+        if (methods[i] == method)
+            return true;
+    }
+    return false;
+}
+
+static std::vector<std::string> normalizeConfiguredMethods(const std::vector<std::string>& configured) {
+    std::vector<std::string> allowed;
+    // Project policy: GET is always allowed.
+    allowed.push_back("GET");
+    if (hasMethod(configured, "POST"))
+        allowed.push_back("POST");
+    if (hasMethod(configured, "DELETE"))
+        allowed.push_back("DELETE");
+    return allowed;
+}
+
+static std::vector<std::string> resolveAllowedMethods(const LocationConfig* loc, const ServerConfig& cfg) {
+    if (loc != NULL) {
+        if (loc->hasAllowMethods())
+            return normalizeConfiguredMethods(loc->getAllowMethods());
+        if (loc->hasMethods())
+            return normalizeConfiguredMethods(loc->getMethods());
+    }
+    if (cfg.hasAllowMethods())
+        return normalizeConfiguredMethods(cfg.getAllowMethods());
+    if (cfg.hasMethods())
+        return normalizeConfiguredMethods(cfg.getMethods());
+
+    std::vector<std::string> defaults;
+    defaults.push_back("GET");
+    return defaults;
+}
+
+static std::string buildAllowHeaderValue(const std::vector<std::string>& allowed) {
+    std::string value;
+    if (hasMethod(allowed, "GET"))
+        value += "GET";
+    if (hasMethod(allowed, "POST")) {
+        if (!value.empty()) value += ", ";
+        value += "POST";
+    }
+    if (hasMethod(allowed, "DELETE")) {
+        if (!value.empty()) value += ", ";
+        value += "DELETE";
+    }
+    return value;
+}
+
 static bool locationHasCgiForUri(const LocationConfig& loc, const std::string& uri) {
     if (!loc.hasCgiPass())
         return false;
@@ -574,17 +625,17 @@ void Server::onRequest(int fd, const HttpRequest& req) {
     for (size_t i = 0; i < locations.size(); ++i)
         router.addLocation(locations[i]);
     const LocationConfig* location = router.match(uriPath);
+    const std::vector<std::string> allowedMethods = resolveAllowedMethods(location, cfg);
+    const std::string allowHeader = buildAllowHeaderValue(allowedMethods);
 
     if (location == NULL) {
         resp = buildErrorResponse(404, cfg);
     } else {
-        bool allowed = router.isMethodAllowed(location, req.getMethod());
-        if (!allowed && !location->hasAllowMethods() && !location->hasMethods())
-            allowed = isMethodAllowed(cfg, req.getMethod());
+        bool allowed = hasMethod(allowedMethods, req.getMethod());
 
         if (!allowed) {
             resp = buildErrorResponse(405, cfg);
-            resp.setHeader("Allow", "GET, POST, DELETE");
+            resp.setHeader("Allow", allowHeader);
         } else if (locationHasCgiForUri(*location, req.getURI())) {
             CgiHandler cgiHandler;
             resp = cgiHandler.handle(req, *location);
@@ -606,7 +657,7 @@ void Server::onRequest(int fd, const HttpRequest& req) {
             int code = resp.getStatusCode();
             HttpResponse errResp = buildErrorResponse(code, cfg);
             if (code == 405)
-                errResp.setHeader("Allow", "GET, POST, DELETE");
+                errResp.setHeader("Allow", allowHeader);
             resp = errResp;
         }
 
