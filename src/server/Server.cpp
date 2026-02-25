@@ -100,6 +100,19 @@ static bool locationHasCgiForUri(const LocationConfig& loc, const std::string& u
     return pass.find(ext) != pass.end();
 }
 
+static bool exceedsClientMaxBodySize(const HttpRequest& req, size_t maxBodySize) {
+    const std::map<std::string, std::string>& headers = req.getHeaders();
+    std::map<std::string, std::string>::const_iterator clIt = headers.find("content-length");
+    if (clIt != headers.end()) {
+        std::istringstream iss(clIt->second);
+        size_t contentLen = 0;
+        iss >> contentLen;
+        if (!iss.fail() && contentLen > maxBodySize)
+            return true;
+    }
+    return req.getBody().size() > maxBodySize;
+}
+
 Server::Server(const std::vector<ServerConfig>& cfgs)
 : _configs(cfgs), _sidSeq(1) {
     if (_configs.empty())
@@ -309,6 +322,15 @@ void    Server::handleClientEvent(size_t idx)
             {
                 // 두번째 요청 있을 경우, 첫번째 요청(consumedLength)까지 지우기 -> 다음 요청을 남겨둬야함
                 in.erase(0, result.getConsumedLength());
+
+                const ServerConfig& cfg = pickServerConfig(fd, req);
+                if (exceedsClientMaxBodySize(req, cfg.getClientMaxBodySize())) {
+                    HttpResponse resp = buildErrorResponse(413, cfg);
+                    std::string bytes = resp.toString();
+                    conn->queueWrite(bytes);
+                    conn->closeAfterWrite();
+                    break ;
+                }
 
                 conn->incRequestCount();
                 onRequest(fd, req);
