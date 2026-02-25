@@ -15,8 +15,8 @@
 /* TODO) 임시로 넣은 기본 경로 (semantic validation 목적) / 팀 협의 필요 */
 static const std::string	DEFAULT_SERVER_ROOT = "./www";
 static const std::string	DEFAULT_ERROR_PAGE = "/errors/404.html";
-static const size_t			DEFAULT_CLIENT_MAX_BODY_SIZE = 1000000; // ex) 1MB (임시값)
-static const size_t			MAX_CLIENT_BODY_SIZE = 100000000; // 100MB (임시로 넣은 값)
+static const size_t			DEFAULT_CLIENT_MAX_BODY_SIZE = 10 * 1024 * 1024; // 10MB
+static const size_t			MAX_CLIENT_BODY_SIZE = 10 * 1024 * 1024; // 정책: 최대 10MB
 static const int			DEFAULT_MAX_CONNECTIONS = 1024;
 static const int			DEFAULT_IDLE_TIMEOUT = 15;
 static const int			DEFAULT_WRITE_TIMEOUT = 10;
