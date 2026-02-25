@@ -46,8 +46,9 @@ void Connection::incRequestCount() { ++_requestsHandled; }
 int Connection::requestCount() const { return _requestsHandled; }
 
 bool Connection::onReadable() {
-    // Maximum input buffer size to prevent unbounded memory growth (e.g., 1MB)
-    static const size_t MAX_INPUT_SIZE = 1024 * 1024;
+    // Must be large enough to return 413 for body-limit violations instead of
+    // dropping the connection before request validation.
+    static const size_t MAX_INPUT_SIZE = (10 * 1024 * 1024) + (64 * 1024);
 
     char buf[8192];
     ssize_t n = ::recv(_fd, buf, sizeof(buf), 0);
