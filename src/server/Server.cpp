@@ -683,19 +683,6 @@ void Server::onRequest(int fd, const HttpRequest& req) {
             resp = errResp;
         }
 
-        // keep the previous simple session demo route as an optional endpoint
-        if (uriPath == "/counter") {
-            Session& s = getOrCreateSession(req, resp);
-            s.counter++;
-            std::ostringstream body;
-            body << "session counter = " << s.counter << "\n";
-            resp.setStatus(200);
-            resp.setBody(body.str());
-        } else if (uriPath == "/logout") {
-            resp.setHeader("Set-Cookie", "sid=deleted; Path=/; Max-Age=0");
-            resp.setStatus(200);
-            resp.setBody("logged out\n");
-        }
     }
 
     // Connection 헤더 설정

@@ -22,6 +22,7 @@
 #include <iostream>
 #include <errno.h>
 #include <signal.h>
+#include <vector>
 
 CgiHandler::CgiHandler() {}
 CgiHandler::~CgiHandler() {}
@@ -192,11 +193,19 @@ std::string CgiHandler::executeCgi(
         close(pipeIn[0]); close(pipeIn[1]);
         close(pipeOut[0]); close(pipeOut[1]);
 
-        // 환경 변수 설정
+        // 환경 변수 구성 (execve envp)
+        std::vector<std::string> envStrings;
+        std::vector<char*> envp;
+        envStrings.reserve(env.size());
+        envp.reserve(env.size() + 1);
         for (std::map<std::string, std::string>::const_iterator it = env.begin();
              it != env.end(); ++it) {
-            setenv(it->first.c_str(), it->second.c_str(), 1);
+            envStrings.push_back(it->first + "=" + it->second);
         }
+        for (size_t i = 0; i < envStrings.size(); ++i) {
+            envp.push_back(const_cast<char*>(envStrings[i].c_str()));
+        }
+        envp.push_back(NULL);
 
         // 스크립트 디렉토리로 chdir
         size_t lastSlash = scriptPath.find_last_of('/');
@@ -214,7 +223,7 @@ std::string CgiHandler::executeCgi(
         argv[1] = const_cast<char*>(scriptPath.c_str());
         argv[2] = NULL;
 
-        execve(interpreter.c_str(), argv, NULL);
+        execve(interpreter.c_str(), argv, &envp[0]);
         
         // execve 실패 시
         std::cerr << "execve failed: " << strerror(errno) << std::endl;
