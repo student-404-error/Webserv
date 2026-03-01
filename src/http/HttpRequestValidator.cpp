@@ -79,7 +79,6 @@ HttpParseResult	HttpRequestValidator::validateContentLength(const std::map<std::
 }
 
 
-/* TODO) HttpParseResult->_httpStatusCode 번호 확인 */
 HttpParseResult	HttpRequestValidator::validate(const HttpRequest& request)
 {
     // 1) 기본 파싱 중 에러 발생
