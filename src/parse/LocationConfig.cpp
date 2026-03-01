@@ -285,6 +285,10 @@ bool	LocationConfig::hasMethods(void) const { return this->_hasMethods; }
 
 const std::vector<std::string>&	LocationConfig::getMethods(void) const { return this->_methods; }
 
+bool	LocationConfig::hasIndex(void) const { return this->_hasIndex; }
+
+const std::vector<std::string>&	LocationConfig::getIndex(void) const { return this->_index; }
+
 bool	LocationConfig::hasRedirect(void) const { return this->_hasRedirect; }
 
 const Redirect&	LocationConfig::getRedirect(void) const { return this->_redirect; }
@@ -300,3 +304,12 @@ const std::string&	LocationConfig::getUploadStore(void) const { return this->_up
 bool	LocationConfig::hasCgiPass(void) const { return this->_hasCgiPass; }
 
 const std::map<std::string, std::string>&	LocationConfig::getCgiPass(void) const { return this->_cgiPass; }
+
+void	LocationConfig::inheritRootIfUnset(const std::string& serverRoot)
+{
+	if (!this->_rootSet)
+	{
+		this->_root = serverRoot;
+		this->_rootSet = true;
+	}
+}

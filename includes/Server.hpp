@@ -66,6 +66,8 @@ private:
     const ServerConfig& pickServerConfig(int fd, const HttpRequest& req) const;
     std::string extractHostName(const HttpRequest& req) const;
     bool isMethodAllowed(const ServerConfig& cfg, const std::string& method) const;
+    const ServerConfig& pickDefaultServerConfigForFd(int fd) const;
+    HttpResponse buildErrorResponse(int code, const ServerConfig& cfg) const;
 
     // session helpers
     std::string newSessionId();

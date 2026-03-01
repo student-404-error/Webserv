@@ -179,8 +179,27 @@ void HttpRequest::parseHeaders(const std::string& block) {
 
     // Content-Length 가 있으면 바디 길이 설정
     if (headers.count("content-length")) {
-        int len = std::atoi(headers["content-length"].c_str());
-        contentLength = (len > 0) ? static_cast<size_t>(len) : 0;
+        const std::string& cl = headers["content-length"];
+        if (cl.empty()) {
+            error = true;
+            return;
+        }
+
+        for (size_t i = 0; i < cl.size(); ++i) {
+            if (!std::isdigit(static_cast<unsigned char>(cl[i]))) {
+                error = true;
+                return;
+            }
+        }
+
+        std::istringstream iss(cl);
+        size_t parsed = 0;
+        iss >> parsed;
+        if (iss.fail() || !iss.eof()) {
+            error = true;
+            return;
+        }
+        contentLength = parsed;
     }
 
     // Transfer-Encoding: chunked 인 경우 chunked 플래그 설정

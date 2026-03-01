@@ -75,10 +75,6 @@ HttpParseResult	HttpRequestValidator::validateContentLength(const std::map<std::
     if (iss.fail()) // 숫자 변환 실패 감지
         return HttpParseResult(HttpParseResult::PARSE_ERROR, 400, 0);
 
-    // 4) 임시 최대 크기 제한 (10MB)
-    if (value > 10 * 1024 * 1024) // 10MB = 10 × 1024 × 1024 바이트 (최대 허용 body 크기 제한 필요)
-        return HttpParseResult(HttpParseResult::PARSE_ERROR, 413, 0); // 413: 요청 body가 서버가 허용한 크기보다 크다는 RFC 표준 상태코드
-
     return HttpParseResult(HttpParseResult::PARSE_COMPLETE, 0, 0);
 }
 
@@ -86,13 +82,16 @@ HttpParseResult	HttpRequestValidator::validateContentLength(const std::map<std::
 /* TODO) HttpParseResult->_httpStatusCode 번호 확인 */
 HttpParseResult	HttpRequestValidator::validate(const HttpRequest& request)
 {
-    // 1) 아직 요청이 완성되지 않음
+    // 1) 기본 파싱 중 에러 발생
+    if (request.hasError()) {
+        if (request.getErrorType() == HttpRequest::ERROR_REQUEST_TOO_LARGE)
+            return HttpParseResult(HttpParseResult::PARSE_ERROR, 413, 0);
+        return HttpParseResult(HttpParseResult::PARSE_ERROR, 400, 0);
+    }
+
+    // 2) 아직 요청이 완성되지 않음
     if (!request.isComplete())
         return HttpParseResult(HttpParseResult::PARSE_NEED_MORE, 0, 0);
-
-    // 2) 기본 파싱 중 에러 발생
-    if (request.hasError())
-        return HttpParseResult(HttpParseResult::PARSE_ERROR, 400, 0);
 
     // 3) HTTP 버전 검사: HTTP/1.1이 아니면 505 HTTP Version Not Supported
     if (request.getVersion() != "HTTP/1.1")
@@ -130,4 +129,3 @@ HttpParseResult	HttpRequestValidator::validate(const HttpRequest& request)
     return HttpParseResult(HttpParseResult::PARSE_COMPLETE, 0, request.getConsumedLength()); // 여기에서 HttpRequest가 계산한 consumedLength를 result._consumedLength값에 반환/저장
 
 }
-

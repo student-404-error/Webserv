@@ -136,7 +136,7 @@ HttpResponse POSTHandler::handleMultipart(const HttpRequest& request,
     HttpResponse res;
 
     // 업로드가 비활성화되어 있으면 403
-    if (!location.uploadEnabled) {
+    if (!location.hasUploadStore()) {
         res.setStatus(403);
         res.setBody("<h1>403 Forbidden</h1><p>File upload not allowed</p>");
         return res;
@@ -150,7 +150,7 @@ HttpResponse POSTHandler::handleMultipart(const HttpRequest& request,
     }
 
     // 업로드 디렉토리 확인 및 생성
-    std::string uploadDir = location.uploadDir;
+    std::string uploadDir = location.getUploadStore();
     if (uploadDir.empty()) {
         res.setStatus(500);
         res.setBody("<h1>500 Internal Server Error</h1><p>Upload directory not configured</p>");

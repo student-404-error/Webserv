@@ -1,4 +1,10 @@
 SRCS = main.cpp \
+       src/http/Router.cpp \
+       src/http/GetHandler.cpp \
+       src/http/PostHandler.cpp \
+       src/http/DeleteHandler.cpp \
+       src/http/CgiHandler.cpp \
+       src/http/ErrorHandler.cpp \
        src/http/HttpRequest.cpp \
        src/http/HttpRequestValidator.cpp \
        src/http/HttpResponse.cpp \

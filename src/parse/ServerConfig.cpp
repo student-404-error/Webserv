@@ -15,8 +15,12 @@
 /* TODO) 임시로 넣은 기본 경로 (semantic validation 목적) / 팀 협의 필요 */
 static const std::string	DEFAULT_SERVER_ROOT = "./www";
 static const std::string	DEFAULT_ERROR_PAGE = "/errors/404.html";
-static const size_t			DEFAULT_CLIENT_MAX_BODY_SIZE = 1000000; // ex) 1MB (임시값)
-static const size_t			MAX_CLIENT_BODY_SIZE = 100000000; // 100MB (임시로 넣은 값)
+static const size_t			DEFAULT_CLIENT_MAX_BODY_SIZE = 10 * 1024 * 1024; // 10MB
+static const size_t			MAX_CLIENT_BODY_SIZE = 10 * 1024 * 1024; // 정책: 최대 10MB
+static const int			DEFAULT_MAX_CONNECTIONS = 1024;
+static const int			DEFAULT_IDLE_TIMEOUT = 15;
+static const int			DEFAULT_WRITE_TIMEOUT = 10;
+static const int			DEFAULT_KEEPALIVE_MAX = 100;
 
 
 /* 공통 helper func */
@@ -47,7 +51,9 @@ static void	parseListenValue(const std::string& value, std::string& ip, int& por
 }
 
 ServerConfig::ServerConfig() : _root(""), _errorPage(""), _hasServerNames(false), _hasMethods(false), _clientMaxBodySize(0),
-	_hasClientMaxBodySize(false), _hasIndex(false), _hasRedirect(false), _hasAllowMethods(false) {}
+	_hasClientMaxBodySize(false), _hasIndex(false), _hasRedirect(false), _hasAllowMethods(false),
+	_maxConnections(0), _hasMaxConnections(false), _idleTimeout(0), _hasIdleTimeout(false),
+	_writeTimeout(0), _hasWriteTimeout(false), _keepAliveMax(0), _hasKeepAliveMax(false) {}
 
 ServerConfig::~ServerConfig() {}
 
@@ -281,6 +287,51 @@ void ServerConfig::handleAllowMethods(const std::vector<Token>& tokens, size_t& 
 	throw ConfigSyntaxException("Error: allow_methods: missing ';'");
 }
 
+static int parsePositiveIntDirective(const std::vector<Token>& tokens, size_t& i,
+	const std::string& name, int minVal, int maxVal)
+{
+	const Token& valueToken = directiveSyntaxCheck(tokens, i, name);
+	if (!isNumber(valueToken.value))
+		throw ConfigSyntaxException("Error: " + name + " must be a number");
+
+	long value = std::atol(valueToken.value.c_str());
+	if (value < minVal || value > maxVal)
+		throw ConfigSemanticException("Error: " + name + " out of range");
+	return static_cast<int>(value);
+}
+
+void ServerConfig::handleMaxConnections(const std::vector<Token>& tokens, size_t& i)
+{
+	if (_hasMaxConnections)
+		throw ConfigSemanticException("Error: duplicate max_connections");
+	_maxConnections = parsePositiveIntDirective(tokens, i, "max_connections", 1, 1000000);
+	_hasMaxConnections = true;
+}
+
+void ServerConfig::handleIdleTimeout(const std::vector<Token>& tokens, size_t& i)
+{
+	if (_hasIdleTimeout)
+		throw ConfigSemanticException("Error: duplicate idle_timeout");
+	_idleTimeout = parsePositiveIntDirective(tokens, i, "idle_timeout", 1, 86400);
+	_hasIdleTimeout = true;
+}
+
+void ServerConfig::handleWriteTimeout(const std::vector<Token>& tokens, size_t& i)
+{
+	if (_hasWriteTimeout)
+		throw ConfigSemanticException("Error: duplicate write_timeout");
+	_writeTimeout = parsePositiveIntDirective(tokens, i, "write_timeout", 1, 86400);
+	_hasWriteTimeout = true;
+}
+
+void ServerConfig::handleKeepAliveMax(const std::vector<Token>& tokens, size_t& i)
+{
+	if (_hasKeepAliveMax)
+		throw ConfigSemanticException("Error: duplicate keepalive_max");
+	_keepAliveMax = parsePositiveIntDirective(tokens, i, "keepalive_max", 1, 1000000);
+	_hasKeepAliveMax = true;
+}
+
 void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 {
 	const std::string	&field = tokens[i].value;
@@ -303,6 +354,14 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleMethods(tokens, i);
 	else if (field == "allow_methods")
 		handleAllowMethods(tokens, i);
+	else if (field == "max_connections")
+		handleMaxConnections(tokens, i);
+	else if (field == "idle_timeout")
+		handleIdleTimeout(tokens, i);
+	else if (field == "write_timeout")
+		handleWriteTimeout(tokens, i);
+	else if (field == "keepalive_max")
+		handleKeepAliveMax(tokens, i);
 	else
 		throw ConfigSyntaxException("Error: unknown server directive: " + field);
 }
@@ -388,6 +447,16 @@ void	ServerConfig::validateServerBlock()
 	applyDefaultErrorPage(); // 3) error_page 기본값
 	if (!this->_hasClientMaxBodySize) // 필수는 아니지만, 런타임에서 반드시 필요
 		this->_clientMaxBodySize = DEFAULT_CLIENT_MAX_BODY_SIZE;
+	if (!this->_hasMaxConnections)
+		this->_maxConnections = DEFAULT_MAX_CONNECTIONS;
+	if (!this->_hasIdleTimeout)
+		this->_idleTimeout = DEFAULT_IDLE_TIMEOUT;
+	if (!this->_hasWriteTimeout)
+		this->_writeTimeout = DEFAULT_WRITE_TIMEOUT;
+	if (!this->_hasKeepAliveMax)
+		this->_keepAliveMax = DEFAULT_KEEPALIVE_MAX;
+	for (size_t i = 0; i < this->_locations.size(); ++i)
+		this->_locations[i].inheritRootIfUnset(this->_root);
 	duplicateLocationPathCheck(); // 4) location path 중복 검사
 }
 
@@ -411,3 +480,19 @@ const Redirect&	ServerConfig::getRedirect(void) const { return this->_redirect; 
 bool	ServerConfig::hasAllowMethods(void) const { return this->_hasAllowMethods; }
 
 const std::vector<std::string>&	ServerConfig::getAllowMethods(void) const { return this->_allowMethods; }
+
+bool	ServerConfig::hasMaxConnections(void) const { return this->_hasMaxConnections; }
+
+int		ServerConfig::getMaxConnections(void) const { return this->_maxConnections; }
+
+bool	ServerConfig::hasIdleTimeout(void) const { return this->_hasIdleTimeout; }
+
+int		ServerConfig::getIdleTimeout(void) const { return this->_idleTimeout; }
+
+bool	ServerConfig::hasWriteTimeout(void) const { return this->_hasWriteTimeout; }
+
+int		ServerConfig::getWriteTimeout(void) const { return this->_writeTimeout; }
+
+bool	ServerConfig::hasKeepAliveMax(void) const { return this->_hasKeepAliveMax; }
+
+int		ServerConfig::getKeepAliveMax(void) const { return this->_keepAliveMax; }

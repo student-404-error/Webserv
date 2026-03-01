@@ -1,6 +1,12 @@
 #include "Server.hpp"
 #include "HttpParseResult.hpp"
 #include "HttpRequestValidator.hpp"
+#include "Router.hpp"
+#include "GetHandler.hpp"
+#include "PostHandler.hpp"
+#include "DeleteHandler.hpp"
+#include "CgiHandler.hpp"
+#include "ErrorHandler.hpp"
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
@@ -18,6 +24,95 @@ static void fatal(const char* msg) {
     std::exit(1);
 }
 
+static std::string stripQueryString(const std::string& uri) {
+    size_t qpos = uri.find('?');
+    if (qpos == std::string::npos)
+        return uri;
+    return uri.substr(0, qpos);
+}
+
+static std::string toLowerAscii(std::string s) {
+    for (size_t i = 0; i < s.size(); ++i)
+        s[i] = static_cast<char>(std::tolower(static_cast<unsigned char>(s[i])));
+    return s;
+}
+
+static bool hasMethod(const std::vector<std::string>& methods, const std::string& method) {
+    for (size_t i = 0; i < methods.size(); ++i) {
+        if (methods[i] == method)
+            return true;
+    }
+    return false;
+}
+
+static std::vector<std::string> normalizeConfiguredMethods(const std::vector<std::string>& configured) {
+    std::vector<std::string> allowed;
+    // Project policy: GET is always allowed.
+    allowed.push_back("GET");
+    if (hasMethod(configured, "POST"))
+        allowed.push_back("POST");
+    if (hasMethod(configured, "DELETE"))
+        allowed.push_back("DELETE");
+    return allowed;
+}
+
+static std::vector<std::string> resolveAllowedMethods(const LocationConfig* loc, const ServerConfig& cfg) {
+    if (loc != NULL) {
+        if (loc->hasAllowMethods())
+            return normalizeConfiguredMethods(loc->getAllowMethods());
+        if (loc->hasMethods())
+            return normalizeConfiguredMethods(loc->getMethods());
+    }
+    if (cfg.hasAllowMethods())
+        return normalizeConfiguredMethods(cfg.getAllowMethods());
+    if (cfg.hasMethods())
+        return normalizeConfiguredMethods(cfg.getMethods());
+
+    std::vector<std::string> defaults;
+    defaults.push_back("GET");
+    return defaults;
+}
+
+static std::string buildAllowHeaderValue(const std::vector<std::string>& allowed) {
+    std::string value;
+    if (hasMethod(allowed, "GET"))
+        value += "GET";
+    if (hasMethod(allowed, "POST")) {
+        if (!value.empty()) value += ", ";
+        value += "POST";
+    }
+    if (hasMethod(allowed, "DELETE")) {
+        if (!value.empty()) value += ", ";
+        value += "DELETE";
+    }
+    return value;
+}
+
+static bool locationHasCgiForUri(const LocationConfig& loc, const std::string& uri) {
+    if (!loc.hasCgiPass())
+        return false;
+    const std::string path = stripQueryString(uri);
+    size_t dot = path.find_last_of('.');
+    if (dot == std::string::npos)
+        return false;
+    const std::string ext = path.substr(dot);
+    const std::map<std::string, std::string>& pass = loc.getCgiPass();
+    return pass.find(ext) != pass.end();
+}
+
+static bool exceedsClientMaxBodySize(const HttpRequest& req, size_t maxBodySize) {
+    const std::map<std::string, std::string>& headers = req.getHeaders();
+    std::map<std::string, std::string>::const_iterator clIt = headers.find("content-length");
+    if (clIt != headers.end()) {
+        std::istringstream iss(clIt->second);
+        size_t contentLen = 0;
+        iss >> contentLen;
+        if (!iss.fail() && contentLen > maxBodySize)
+            return true;
+    }
+    return req.getBody().size() > maxBodySize;
+}
+
 Server::Server(const std::vector<ServerConfig>& cfgs)
 : _configs(cfgs), _sidSeq(1) {
     if (_configs.empty())
@@ -33,11 +128,11 @@ Server::Server(const std::vector<ServerConfig>& cfgs)
     if (ports.empty())
         throw std::runtime_error("No listen port configured");
 
-    // 기본값 설정 (TODO: config에서 받아오도록 확장)
-    _maxConnections = 1024;
-    _idleTimeoutSec = 15;   // idle/read timeout 기본값
-    _writeTimeoutSec = 10;  // 쓰기 지연 기본값
-    _maxKeepAlive = 100;    // 연결당 최대 요청 수
+    // server-level runtime tuning values (use first server block as global runtime policy)
+    _maxConnections = _configs[0].getMaxConnections();
+    _idleTimeoutSec = _configs[0].getIdleTimeout();
+    _writeTimeoutSec = _configs[0].getWriteTimeout();
+    _maxKeepAlive = _configs[0].getKeepAliveMax();
 
     // 각 포트마다 리스너 생성 및 poll 등록
     for (std::set<int>::const_iterator it = ports.begin(); it != ports.end(); ++it) {
@@ -213,10 +308,8 @@ void    Server::handleClientEvent(size_t idx)
             // 추후 ServerConfig 기반 error_page lookup 구현 예정
             if (result.getStatus() == HttpParseResult::PARSE_ERROR)
             {
-                HttpResponse    resp;
-                resp.setStatus(result.getHttpStatusCode());
-                resp.setBody(""); // config error page 기능과 충돌방지 : config ex) error_page 400 /400.html;
-                // 바디를 강제로 넣으면 config 기반 error_page 로직과 충돌
+                const ServerConfig& cfg = pickDefaultServerConfigForFd(fd);
+                HttpResponse resp = buildErrorResponse(result.getHttpStatusCode(), cfg);
 
                 std::string bytes = resp.toString();
                 conn->queueWrite(bytes);
@@ -229,6 +322,15 @@ void    Server::handleClientEvent(size_t idx)
             {
                 // 두번째 요청 있을 경우, 첫번째 요청(consumedLength)까지 지우기 -> 다음 요청을 남겨둬야함
                 in.erase(0, result.getConsumedLength());
+
+                const ServerConfig& cfg = pickServerConfig(fd, req);
+                if (exceedsClientMaxBodySize(req, cfg.getClientMaxBodySize())) {
+                    HttpResponse resp = buildErrorResponse(413, cfg);
+                    std::string bytes = resp.toString();
+                    conn->queueWrite(bytes);
+                    conn->closeAfterWrite();
+                    break ;
+                }
 
                 conn->incRequestCount();
                 onRequest(fd, req);
@@ -435,14 +537,14 @@ std::string Server::extractHostName(const HttpRequest& req) const {
     if (host[0] == '[') {
         size_t end = host.find(']');
         if (end != std::string::npos)
-            return host.substr(0, end + 1);
-        return host;
+            return toLowerAscii(host.substr(0, end + 1));
+        return toLowerAscii(host);
     }
 
     size_t colon = host.find(':');
     if (colon != std::string::npos)
-        return host.substr(0, colon);
-    return host;
+        return toLowerAscii(host.substr(0, colon));
+    return toLowerAscii(host);
 }
 
 const ServerConfig& Server::pickServerConfig(int fd, const HttpRequest& req) const {
@@ -473,7 +575,7 @@ const ServerConfig& Server::pickServerConfig(int fd, const HttpRequest& req) con
         if (cfg.hasServerNames()) {
             const std::vector<std::string>& names = cfg.getServerNames();
             for (size_t k = 0; k < names.size(); ++k) {
-                if (names[k] == host)
+                if (toLowerAscii(names[k]) == host)
                     return cfg;
             }
         }
@@ -482,6 +584,27 @@ const ServerConfig& Server::pickServerConfig(int fd, const HttpRequest& req) con
     if (fallback)
         return *fallback;
     return _configs[0];
+}
+
+const ServerConfig& Server::pickDefaultServerConfigForFd(int fd) const {
+    std::map<int, int>::const_iterator pIt = _clientPort.find(fd);
+    int port = (pIt != _clientPort.end()) ? pIt->second : _port;
+
+    for (size_t i = 0; i < _configs.size(); ++i) {
+        const ServerConfig& cfg = _configs[i];
+        const std::vector<int> ports = cfg.getListenPorts();
+        for (size_t j = 0; j < ports.size(); ++j) {
+            if (ports[j] == port)
+                return cfg;
+        }
+    }
+    return _configs[0];
+}
+
+HttpResponse Server::buildErrorResponse(int code, const ServerConfig& cfg) const {
+    std::map<int, std::string> errorPages;
+    errorPages[code] = cfg.getErrorPage();
+    return ErrorHandler::buildError(code, errorPages);
 }
 
 bool Server::isMethodAllowed(const ServerConfig& cfg, const std::string& method) const {
@@ -517,41 +640,49 @@ void Server::onRequest(int fd, const HttpRequest& req) {
         keepAlive = false;
 
     HttpResponse resp;
+    const std::string uriPath = stripQueryString(req.getURI());
 
-    if (!isMethodAllowed(cfg, req.getMethod())) {
-        resp.setStatus(405);
-        resp.setHeader("Allow", "GET, POST, DELETE");
-        resp.setBody("405 Method Not Allowed\n");
+    Router router;
+    const std::vector<LocationConfig>& locations = cfg.getLocations();
+    for (size_t i = 0; i < locations.size(); ++i)
+        router.addLocation(locations[i]);
+    const LocationConfig* location = router.match(uriPath);
+    const std::vector<std::string> allowedMethods = resolveAllowedMethods(location, cfg);
+    const std::string allowHeader = buildAllowHeaderValue(allowedMethods);
+
+    if (location == NULL) {
+        resp = buildErrorResponse(404, cfg);
     } else {
-    // URI에서 경로 추출 (쿼리 스트링 제거)
-    std::string uri = req.getURI();
-    std::string path = uri;
-    size_t qpos = uri.find('?');
-    if (qpos != std::string::npos) {
-        path = uri.substr(0, qpos);
-    }
+        bool allowed = hasMethod(allowedMethods, req.getMethod());
 
-    // ---- Simple routes (session demo) ----
-    if (path == "/") {
-        resp.setBody("Hello from webserv skeleton\nTry /counter\n");
-    }
-    else if (path == "/counter") {
-        Session& s = getOrCreateSession(req, resp);
-        s.counter++;
+        if (!allowed) {
+            resp = buildErrorResponse(405, cfg);
+            resp.setHeader("Allow", allowHeader);
+        } else if (locationHasCgiForUri(*location, req.getURI())) {
+            CgiHandler cgiHandler;
+            resp = cgiHandler.handle(req, *location);
+        } else if (req.getMethod() == "GET") {
+            GETHandler getHandler;
+            resp = getHandler.handle(req, *location);
+        } else if (req.getMethod() == "POST") {
+            size_t maxBody = cfg.hasClientMaxBodySize() ? cfg.getClientMaxBodySize() : 0;
+            POSTHandler postHandler(maxBody);
+            resp = postHandler.handle(req, *location);
+        } else if (req.getMethod() == "DELETE") {
+            DELETEHandler deleteHandler;
+            resp = deleteHandler.handle(req, *location);
+        } else {
+            resp = buildErrorResponse(501, cfg);
+        }
 
-        std::ostringstream body;
-        body << "session counter = " << s.counter << "\n";
-        resp.setBody(body.str());
-    }
-    else if (path == "/logout") {
-        // expire cookie (very simple)
-        resp.setHeader("Set-Cookie", "sid=deleted; Path=/; Max-Age=0");
-        resp.setBody("logged out\n");
-    }
-    else {
-        resp.setStatus(404);
-        resp.setBody("404 Not Found\n");
-    }
+        if (resp.getStatusCode() >= 400) {
+            int code = resp.getStatusCode();
+            HttpResponse errResp = buildErrorResponse(code, cfg);
+            if (code == 405)
+                errResp.setHeader("Allow", allowHeader);
+            resp = errResp;
+        }
+
     }
 
     // Connection 헤더 설정
