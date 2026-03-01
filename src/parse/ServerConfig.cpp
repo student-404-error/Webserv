@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:47 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/03/01 18:27:20 by princessj        ###   ########.fr       */
+/*   Updated: 2026/03/01 19:25:37 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -53,9 +53,26 @@ static void	parseListenValue(const std::string& value, std::string& ip, int& por
 ServerConfig::ServerConfig() : _root(""), _errorPage(""), _hasServerNames(false), _hasMethods(false), _clientMaxBodySize(0),
 	_hasClientMaxBodySize(false), _hasIndex(false), _hasRedirect(false), _hasAllowMethods(false),
 	_maxConnections(0), _hasMaxConnections(false), _idleTimeout(0), _hasIdleTimeout(false),
-	_writeTimeout(0), _hasWriteTimeout(false), _keepAliveMax(0), _hasKeepAliveMax(false) {}
+	_writeTimeout(0), _hasWriteTimeout(false), _keepAliveMax(0), _hasKeepAliveMax(false), _autoindex(false), _hasAutoindex(false) {}
 
 ServerConfig::~ServerConfig() {}
+
+void	ServerConfig::handleAutoIndex(const std::vector<Token>& tokens, size_t& i)
+{
+    if (this->_hasAutoindex)
+        throw ConfigSemanticException("Error: duplicate autoindex directive");
+
+    const Token	&valueToken = directiveSyntaxCheck(tokens, i, "autoindex");
+
+    if (valueToken.value == "on")
+        this->_autoindex = true;
+    else if (valueToken.value == "off")
+        this->_autoindex = false;
+    else
+        throw ConfigSyntaxException("Error: autoindex must be 'on' or 'off'");
+
+    this->_hasAutoindex = true;
+}
 
 void	ServerConfig::handleListen(const std::vector<Token>& tokens, size_t& i)
 {
@@ -80,10 +97,31 @@ void	ServerConfig::handleRoot(const std::vector<Token> &tokens, size_t &i)
 	this->_root = pathToken.value;
 }
 
-void	ServerConfig::handleErrorPage(const std::vector<Token> &tokens, size_t &i)
+void ServerConfig::handleErrorPage(const std::vector<Token>& tokens, size_t& i)
 {
-	const Token	&pathToken = directiveSyntaxCheck(tokens, i, "error_page");
-	this->_errorPage = pathToken.value;
+    i++; // error_page
+
+    if (i >= tokens.size() || tokens[i].type != TOKEN_WORD || !isNumber(tokens[i].value))
+        throw ConfigSyntaxException("Error: error_page requires status code");
+
+    int status = std::atoi(tokens[i].value.c_str());
+    i++;
+
+    if (i >= tokens.size() || tokens[i].type != TOKEN_WORD)
+        throw ConfigSyntaxException("Error: error_page requires path");
+
+    std::string path = tokens[i].value;
+    i++;
+
+    if (i >= tokens.size() || tokens[i].type != TOKEN_SEMICOLON)
+        throw ConfigSyntaxException("Error: missing ';' after error_page");
+
+    i++;
+
+    if (this->_errorPages.count(status))
+        throw ConfigSemanticException("Error: duplicate error_page for status");
+
+    this->_errorPages[status] = path;
 }
 
 void	ServerConfig::handleMethods(const std::vector<Token>& tokens, size_t& i)
@@ -362,6 +400,8 @@ void	ServerConfig::parseDirective(const std::vector<Token> &tokens, size_t &i)
 		handleWriteTimeout(tokens, i);
 	else if (field == "keepalive_max")
 		handleKeepAliveMax(tokens, i);
+	else if (field == "autoindex")
+    	handleAutoIndex(tokens, i);
 	else
 		throw ConfigSyntaxException("Error: unknown server directive: " + field);
 }
@@ -496,3 +536,7 @@ int		ServerConfig::getWriteTimeout(void) const { return this->_writeTimeout; }
 bool	ServerConfig::hasKeepAliveMax(void) const { return this->_hasKeepAliveMax; }
 
 int		ServerConfig::getKeepAliveMax(void) const { return this->_keepAliveMax; }
+
+bool	ServerConfig::hasAutoindex(void) const { return this->_hasAutoindex; }
+
+bool	ServerConfig::getAutoindex(void) const { return this->_autoindex; }
