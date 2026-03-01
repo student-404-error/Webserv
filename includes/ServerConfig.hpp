@@ -6,7 +6,7 @@
 /*   By: princessj <princessj@student.42.fr>        +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/01/27 17:31:12 by jihyeki2          #+#    #+#             */
-/*   Updated: 2026/02/16 22:38:18 by princessj        ###   ########.fr       */
+/*   Updated: 2026/03/01 19:09:25 by princessj        ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -61,6 +61,8 @@ class	ServerConfig
 		int								getWriteTimeout(void) const;
 		bool							hasKeepAliveMax(void) const;
 		int								getKeepAliveMax(void) const;
+		bool							hasAutoindex(void) const;
+		bool							getAutoindex(void) const;
 
 
 
@@ -84,6 +86,7 @@ class	ServerConfig
 		void	handleIdleTimeout(const std::vector<Token>& tokens, size_t& i);
 		void	handleWriteTimeout(const std::vector<Token>& tokens, size_t& i);
 		void	handleKeepAliveMax(const std::vector<Token>& tokens, size_t& i);
+		void	handleAutoIndex(const std::vector<Token>& tokens, size_t& i);
 		
 		void	duplicateLocationPathCheck(void) const;
 		void	applyDefaultErrorPage(void);
@@ -124,6 +127,10 @@ class	ServerConfig
 		bool						_hasWriteTimeout;
 		int							_keepAliveMax;
 		bool						_hasKeepAliveMax;
+
+		bool						_autoindex;
+		bool						_hasAutoindex;
+		std::map<int, std::string>	_errorPages;
 };
 
 #endif
