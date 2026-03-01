@@ -158,7 +158,6 @@ void HttpRequest::parseHeaders(const std::string& block) {
         std::string key = toLower(trim(line.substr(0, pos)));
         std::string value = trim(line.substr(pos + 1));
 
-        /* TODO) 팀원들 확인 - http 디테일 파싱 수정 */
         /* Content-Length가 여러 개 있을 경우: 값이 같아야 한다, 다르면 400 처리 */
         /* Content-Length가 여러개 있을 수 있음 (단, 값이 모두 동일해야함) */
         /* CEHCK) 하지만 우리는 nginx 수준의 완전한 RFC 구현을 요구하지 않기 때문에 그냥 중복 Content-Length는 그냥 400 처리로 진행: 중복 Content-Length 값까지 비교 검사는 진행 안함 */

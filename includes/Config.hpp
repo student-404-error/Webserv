@@ -13,9 +13,7 @@
 #ifndef CONFIG_HPP
 #define CONFIG_HPP
 
-/* TODO) */
-/* 프로그램 시작할때 config 파일 없으면 (우리)서버가 기본으로 내장하고 있는 config 파일 불러서 열어주기 */
-#define DEFAULT_CONFIG_PATH "./config/default.conf" // 임시로 넣은 경로
+#define DEFAULT_CONFIG_PATH "./configuration.txt"
 
 #include "Token.hpp"
 #include "ConfigTokenizer.hpp"

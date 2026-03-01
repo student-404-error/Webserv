@@ -123,7 +123,6 @@ Server::Server(const std::vector<ServerConfig>& cfgs)
     for (size_t i = 0; i < _configs.size(); ++i) {
         const std::vector<int>& ps = _configs[i].getListenPorts();
         ports.insert(ps.begin(), ps.end());
-        // TODO: 가상호스트 매핑을 위해 포트별 서버 리스트를 별도 컨테이너에 저장
     }
     if (ports.empty())
         throw std::runtime_error("No listen port configured");
@@ -302,10 +301,6 @@ void    Server::handleClientEvent(size_t idx)
             }
 
             // 2) 파싱 에러 (정확한 HTTP 상태코드 사용)
-            // TODO (B-part)
-            // config의 error_page 설정과 연동 필요
-            // 현재는 기본 상태코드만 반환
-            // 추후 ServerConfig 기반 error_page lookup 구현 예정
             if (result.getStatus() == HttpParseResult::PARSE_ERROR)
             {
                 const ServerConfig& cfg = pickDefaultServerConfigForFd(fd);

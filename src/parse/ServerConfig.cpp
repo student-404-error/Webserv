@@ -12,7 +12,7 @@
 
 #include "ServerConfig.hpp"
 
-/* TODO) 임시로 넣은 기본 경로 (semantic validation 목적) / 팀 협의 필요 */
+/* 임시 기본 경로/제한값 */
 static const std::string	DEFAULT_SERVER_ROOT = "./www";
 static const std::string	DEFAULT_ERROR_PAGE = "/errors/404.html";
 static const size_t			DEFAULT_CLIENT_MAX_BODY_SIZE = 10 * 1024 * 1024; // 10MB
@@ -169,7 +169,7 @@ void	ServerConfig::handleClientMaxBodySize(const std::vector<Token>& tokens, siz
 	if (size <= 0)
 		throw ConfigSemanticException("Error: client_max_body_size must be > 0");
 	
-	if (static_cast<size_t>(size) > MAX_CLIENT_BODY_SIZE) // TODO) MAX SIZE 다시 확인하기
+	if (static_cast<size_t>(size) > MAX_CLIENT_BODY_SIZE)
 		throw ConfigSemanticException("Error: client_max_body_size too large");
 
 	this->_clientMaxBodySize = static_cast<size_t>(size);
